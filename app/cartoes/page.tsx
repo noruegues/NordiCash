@@ -7,13 +7,15 @@ import CreditCardVisual from "@/components/cards/CreditCardVisual";
 import ProgressBar from "@/components/ui/ProgressBar";
 import { useStore, type Cartao, type Bandeira, usoCartao } from "@/lib/store";
 import { brl, dataBR } from "@/lib/format";
-import { Plus, Pencil, Trash2, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Plus, Pencil, Trash2, AlertTriangle, CheckCircle2, Undo2 } from "lucide-react";
 import UpgradeModal from "@/components/UpgradeModal";
 import MoneyInput from "@/components/ui/MoneyInput";
 import { useCurrentUser, getPlanLimit } from "@/lib/auth";
+import ExportButton from "@/components/ui/ExportButton";
+import { exportPDF, exportExcel } from "@/lib/export";
 
 export default function CartoesPage() {
-  const { cartoes, despesas, addCartao, updateCartao, removeCartao, marcarFaturaPaga } = useStore();
+  const { cartoes, despesas, addCartao, updateCartao, removeCartao, marcarFaturaPaga, desmarcarFaturaPaga } = useStore();
   const user = useCurrentUser();
   const [selected, setSelected] = useState<string | null>(cartoes[0]?.id ?? null);
   const [open, setOpen] = useState(false);
@@ -53,6 +55,22 @@ export default function CartoesPage() {
         subtitle="Crédito"
         action={
           <div className="flex items-center gap-2">
+            <ExportButton
+              onExportPDF={() => exportPDF({
+                title: "Cartões", columns: [
+                  { header: "Nome", key: "nome" }, { header: "Banco", key: "banco" },
+                  { header: "Bandeira", key: "bandeira" }, { header: "Limite", key: "limite", format: "brl" },
+                ],
+                rows: cartoes, filename: `nordicash-cartoes-${new Date().toISOString().slice(0, 7)}`,
+              })}
+              onExportExcel={() => exportExcel({
+                title: "Cartões", columns: [
+                  { header: "Nome", key: "nome" }, { header: "Banco", key: "banco" },
+                  { header: "Bandeira", key: "bandeira" }, { header: "Limite", key: "limite", format: "brl" },
+                ],
+                rows: cartoes, filename: `nordicash-cartoes-${new Date().toISOString().slice(0, 7)}`,
+              })}
+            />
             {limit !== Infinity && (
               <span className="text-xs text-zinc-500">{cartoes.length}/{limit}</span>
             )}
@@ -141,12 +159,21 @@ export default function CartoesPage() {
                       value={mesFatura}
                       onChange={(e) => setMesFatura(e.target.value)}
                     />
-                    <button
-                      className={`btn btn-sm ${overdue ? "btn-danger" : "btn-success"}`}
-                      onClick={() => marcarFaturaPaga(cartao.id, mesFatura)}
-                    >
-                      <CheckCircle2 size={14} /> Marcar fatura paga
-                    </button>
+                    {faturaPaga ? (
+                      <button
+                        className="btn btn-sm btn-ghost"
+                        onClick={() => desmarcarFaturaPaga(cartao.id, mesFatura)}
+                      >
+                        <Undo2 size={14} /> Desfazer
+                      </button>
+                    ) : (
+                      <button
+                        className={`btn btn-sm ${overdue ? "btn-danger" : "btn-success"}`}
+                        onClick={() => marcarFaturaPaga(cartao.id, mesFatura)}
+                      >
+                        <CheckCircle2 size={14} /> Marcar fatura paga
+                      </button>
+                    )}
                   </div>
                 }
               >

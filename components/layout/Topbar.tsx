@@ -2,9 +2,10 @@
 import { Search, Bell, Sun, Moon, AlertTriangle, CheckCircle2, CreditCard, X, LogOut, User as UserIcon, Lock, Crown, Camera, Menu } from "lucide-react";
 import { useStore, usoCartao } from "@/lib/store";
 import { useAuth, useCurrentUser, type Plano } from "@/lib/auth";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import { brl } from "@/lib/format";
+import SearchModal from "@/components/SearchModal";
 
 export default function Topbar({ onOpenSidebar }: { onOpenSidebar?: () => void }) {
   const { cartoes, despesas, marcarFaturaPaga } = useStore();
@@ -13,9 +14,22 @@ export default function Topbar({ onOpenSidebar }: { onOpenSidebar?: () => void }
 
   const [openNotif, setOpenNotif] = useState(false);
   const [openProfile, setOpenProfile] = useState(false);
+  const [openSearch, setOpenSearch] = useState(false);
   const [profileTab, setProfileTab] = useState<"menu" | "perfil" | "senha" | "plano">("menu");
   const notifRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
+
+  // ⌘K / Ctrl+K global shortcut
+  const handleGlobalKey = useCallback((e: KeyboardEvent) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+      e.preventDefault();
+      setOpenSearch(true);
+    }
+  }, []);
+  useEffect(() => {
+    document.addEventListener("keydown", handleGlobalKey);
+    return () => document.removeEventListener("keydown", handleGlobalKey);
+  }, [handleGlobalKey]);
 
   const today = new Date();
   const mesAtual = today.toISOString().slice(0, 7);
@@ -51,17 +65,21 @@ export default function Topbar({ onOpenSidebar }: { onOpenSidebar?: () => void }
   const initials = user.nome.split(" ").map((s) => s[0]).slice(0, 2).join("").toUpperCase();
 
   return (
+    <>
     <header className="h-16 border-b border-border bg-surface relative z-20 px-3 sm:px-6 flex items-center gap-2 sm:gap-4">
       {onOpenSidebar && (
         <button className="btn btn-ghost btn-icon md:hidden" onClick={onOpenSidebar} title="Menu">
           <Menu size={18} />
         </button>
       )}
-      <div className="hidden sm:flex items-center gap-2 flex-1 max-w-md bg-surface2 border border-border rounded h-9 px-3">
+      <button
+        className="hidden sm:flex items-center gap-2 flex-1 max-w-md bg-surface2 border border-border rounded h-9 px-3 cursor-pointer hover:border-zinc-500 transition-colors"
+        onClick={() => setOpenSearch(true)}
+      >
         <Search size={15} className="text-zinc-500" />
-        <input className="flex-1 bg-transparent outline-none text-sm placeholder:text-zinc-500" placeholder="Buscar transações, ativos..." />
+        <span className="flex-1 text-left text-sm text-zinc-500">Buscar transações, ativos...</span>
         <kbd className="text-[10px] text-zinc-500 border border-border rounded px-1.5 py-0.5">⌘K</kbd>
-      </div>
+      </button>
 
       <div className="flex-1" />
 
@@ -161,6 +179,8 @@ export default function Topbar({ onOpenSidebar }: { onOpenSidebar?: () => void }
         )}
       </div>
     </header>
+    <SearchModal open={openSearch} onClose={() => setOpenSearch(false)} />
+    </>
   );
 }
 

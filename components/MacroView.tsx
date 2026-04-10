@@ -31,15 +31,22 @@ export default function MacroView({
   // Coletar todos os meses únicos ordenados
   const meses = useMemo(() => Array.from(new Set(filtered.map((i) => i.mesRef))).sort(), [filtered]);
 
+  // Normaliza nome removendo sufixo de parcela "(1/12)" etc para agrupar
+  function normalizeKey(raw: string): string {
+    if (groupMode !== "descricao") return raw;
+    return raw.replace(/\s*\(\d+\/\d+\)\s*$/, "").trim() || raw;
+  }
+
   // Agrupar valores: { [grupo]: { [mes]: total } }
   const pivot = useMemo(() => {
     const map: Record<string, Record<string, number>> = {};
     for (const i of filtered) {
-      const key = String((i as any)[groupMode] ?? "—");
+      const key = normalizeKey(String(i[groupMode] ?? "—"));
       (map[key] ||= {});
       map[key][i.mesRef] = (map[key][i.mesRef] || 0) + i.valor;
     }
     return map;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtered, groupMode]);
 
   const totaisMes: Record<string, number> = {};
@@ -71,7 +78,7 @@ export default function MacroView({
           </div>
           <div>
             <label className="label">Agrupar por</label>
-            <select className="select" value={groupMode} onChange={(e) => setGroupMode(e.target.value as any)}>
+            <select className="select" value={groupMode} onChange={(e) => setGroupMode(e.target.value as typeof groupMode)}>
               {items[0]?.fonte !== undefined && <option value="fonte">Fonte</option>}
               {items[0]?.descricao !== undefined && <option value="descricao">Descrição</option>}
               <option value="categoria">Categoria</option>

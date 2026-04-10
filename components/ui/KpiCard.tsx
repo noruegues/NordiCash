@@ -5,12 +5,14 @@ export default function KpiCard({
   label,
   value,
   delta,
+  deltaLabel,
   icon,
   accent,
 }: {
   label: string;
   value: string;
   delta?: number;
+  deltaLabel?: string;
   icon?: ReactNode;
   accent?: boolean;
 }) {
@@ -24,7 +26,7 @@ export default function KpiCard({
           {delta !== undefined && (
             <div className={`mt-2 inline-flex items-center gap-1 text-xs font-medium ${positive ? "text-success" : "text-danger"}`}>
               {positive ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
-              {Math.abs(delta).toFixed(1)}% vs mês anterior
+              {Math.abs(delta).toFixed(1)}% {deltaLabel || "vs mês anterior"}
             </div>
           )}
         </div>

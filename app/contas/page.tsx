@@ -9,9 +9,11 @@ import { Plus, Pencil, Trash2, Wallet, TrendingUp, TrendingDown } from "lucide-r
 import MoneyInput from "@/components/ui/MoneyInput";
 import UpgradeModal from "@/components/UpgradeModal";
 import { useCurrentUser, getPlanLimit } from "@/lib/auth";
+import ExportButton from "@/components/ui/ExportButton";
+import { exportPDF, exportExcel } from "@/lib/export";
 
 // Saldo real = saldoInicial + entradas (receitas) - saídas (despesas pagas com essa conta; NÃO inclui cartão)
-export function saldoRealConta(contaId: string, state: ReturnType<typeof useStore.getState>) {
+function saldoRealConta(contaId: string, state: ReturnType<typeof useStore.getState>) {
   const { receitas, despesas, contas } = state;
   const conta = contas.find((c) => c.id === contaId);
   if (!conta) return 0;
@@ -62,6 +64,24 @@ export default function ContasPage() {
         subtitle="Saldo real em tempo real"
         action={
           <div className="flex items-center gap-2">
+            <ExportButton
+              onExportPDF={() => exportPDF({
+                title: "Contas Bancárias", columns: [
+                  { header: "Nome", key: "nome" }, { header: "Banco", key: "banco" },
+                  { header: "Tipo", key: "tipo" }, { header: "Saldo Inicial", key: "saldoInicial", format: "brl" },
+                ],
+                rows: contas, totals: { saldoInicial: contas.reduce((s, c) => s + c.saldoInicial, 0) },
+                filename: `nordicash-contas-${new Date().toISOString().slice(0, 7)}`,
+              })}
+              onExportExcel={() => exportExcel({
+                title: "Contas Bancárias", columns: [
+                  { header: "Nome", key: "nome" }, { header: "Banco", key: "banco" },
+                  { header: "Tipo", key: "tipo" }, { header: "Saldo Inicial", key: "saldoInicial", format: "brl" },
+                ],
+                rows: contas, totals: { saldoInicial: contas.reduce((s, c) => s + c.saldoInicial, 0) },
+                filename: `nordicash-contas-${new Date().toISOString().slice(0, 7)}`,
+              })}
+            />
             {limit !== Infinity && (
               <span className="text-xs text-zinc-500">{contas.length}/{limit}</span>
             )}
@@ -167,7 +187,7 @@ function ContaModal({
           </div>
           <div>
             <label className="label">Tipo</label>
-            <select className="select" value={f.tipo} onChange={(e) => setF({ ...f, tipo: e.target.value as any })}>
+            <select className="select" value={f.tipo} onChange={(e) => setF({ ...f, tipo: e.target.value as ContaBancaria["tipo"] })}>
               <option>Corrente</option><option>Poupança</option><option>Pagamento</option>
             </select>
           </div>

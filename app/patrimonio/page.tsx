@@ -12,6 +12,8 @@ import { projecaoPortfolio } from "@/lib/calculations";
 import { brl } from "@/lib/format";
 import { Wallet, Plus, Pencil, Trash2, TrendingUp, TrendingDown, Landmark, Info, RefreshCw } from "lucide-react";
 import { useIndicadores } from "@/lib/indicadores";
+import ExportButton from "@/components/ui/ExportButton";
+import { exportPDF, exportExcel } from "@/lib/export";
 
 // Taxas padrão por tipo (% a.a.)
 const TAXA_PADRAO: Record<Bem["tipo"], { taxa: number; comportamento: "valoriza" | "desvaloriza" }> = {
@@ -92,7 +94,7 @@ export default function PatrimonioPage() {
   // Projeção investimentos com aporte extra opcional
   const projInvData = useMemo(() => {
     const ajustado = investimentos.map((i) => ({ ...i, aporteMensal: i.aporteMensal + aporteExtra / Math.max(1, investimentos.length) }));
-    return projecaoPortfolio(ajustado as any, taxaProj, horizonteAnos * 12);
+    return projecaoPortfolio(ajustado, taxaProj, horizonteAnos * 12);
   }, [investimentos, taxaProj, horizonteAnos, aporteExtra]);
 
   const projInvFinal = projInvData.at(-1)?.valor ?? totalInv;
@@ -171,9 +173,33 @@ export default function PatrimonioPage() {
         title="Patrimônio"
         subtitle="Visão consolidada"
         action={
-          <button className="btn btn-primary" onClick={() => { setEditing(null); setOpen(true); }}>
-            <Plus size={16} /> Novo bem
-          </button>
+          <div className="flex items-center gap-2">
+            <ExportButton
+              onExportPDF={() => exportPDF({
+                title: "Patrimônio — Bens", columns: [
+                  { header: "Nome", key: "nome" }, { header: "Tipo", key: "tipo" },
+                  { header: "Valor Compra", key: "valorCompra", format: "brl" },
+                  { header: "Valor Mercado", key: "valorMercado", format: "brl" },
+                  { header: "Dívida", key: "dividaRestante", format: "brl" },
+                ],
+                rows: bens, totals: { valorMercado: bens.reduce((s, b) => s + b.valorMercado, 0) },
+                filename: `nordicash-patrimonio-${new Date().toISOString().slice(0, 7)}`,
+              })}
+              onExportExcel={() => exportExcel({
+                title: "Patrimônio — Bens", columns: [
+                  { header: "Nome", key: "nome" }, { header: "Tipo", key: "tipo" },
+                  { header: "Valor Compra", key: "valorCompra", format: "brl" },
+                  { header: "Valor Mercado", key: "valorMercado", format: "brl" },
+                  { header: "Dívida", key: "dividaRestante", format: "brl" },
+                ],
+                rows: bens, totals: { valorMercado: bens.reduce((s, b) => s + b.valorMercado, 0) },
+                filename: `nordicash-patrimonio-${new Date().toISOString().slice(0, 7)}`,
+              })}
+            />
+            <button className="btn btn-primary" onClick={() => { setEditing(null); setOpen(true); }}>
+              <Plus size={16} /> Novo bem
+            </button>
+          </div>
         }
       />
 

@@ -593,7 +593,7 @@ function GlassKpi({ label, value, accent }: { label: string; value: string; acce
 
 function AuthLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-screen bg-white text-slate-900 grid lg:grid-cols-2">
+    <div className="min-h-screen bg-white text-slate-900 grid lg:grid-cols-2 auth-light">
       <div className="hidden lg:flex relative p-12 flex-col justify-between overflow-hidden bg-slate-50">
         {/* Background */}
         <div className="absolute inset-0">

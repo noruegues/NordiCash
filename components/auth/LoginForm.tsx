@@ -12,11 +12,11 @@ export default function LoginForm({ onSwitch, onBack }: { onSwitch: () => void; 
 
   return (
     <div className="w-full max-w-sm">
-      <button className="text-sm text-zinc-500 hover:text-zinc-300 inline-flex items-center gap-1 mb-6" onClick={onBack}>
+      <button className="text-sm text-slate-500 hover:text-slate-700 inline-flex items-center gap-1 mb-6" onClick={onBack}>
         <ArrowLeft size={14} /> Voltar
       </button>
       <h1 className="text-2xl font-semibold tracking-tight">Bem-vindo de volta</h1>
-      <p className="text-sm text-zinc-400 mt-1">Entre na sua conta para continuar</p>
+      <p className="text-sm text-slate-400 mt-1">Entre na sua conta para continuar</p>
 
       <form
         className="mt-6 space-y-4"
@@ -43,7 +43,7 @@ export default function LoginForm({ onSwitch, onBack }: { onSwitch: () => void; 
         </button>
       </form>
 
-      <div className="mt-6 text-center text-sm text-zinc-400">
+      <div className="mt-6 text-center text-sm text-slate-400">
         Não tem conta?{" "}
         <button onClick={onSwitch} className="text-primary hover:underline font-medium">Criar agora</button>
       </div>

@@ -1,15 +1,19 @@
 import jwt from 'jsonwebtoken'
 import { cookies } from 'next/headers'
 
-const SECRET = process.env.JWT_SECRET || 'nordicash-fallback-secret'
+function getSecret(): string {
+  const s = process.env.JWT_SECRET
+  if (!s) throw new Error('JWT_SECRET environment variable is required')
+  return s
+}
 
 export function signToken(payload: { userId: string; login: string; isAdmin: boolean }) {
-  return jwt.sign(payload, SECRET, { expiresIn: '7d' })
+  return jwt.sign(payload, getSecret(), { expiresIn: '7d' })
 }
 
 export function verifyToken(token: string) {
   try {
-    return jwt.verify(token, SECRET) as { userId: string; login: string; isAdmin: boolean }
+    return jwt.verify(token, getSecret()) as unknown as { userId: string; login: string; isAdmin: boolean }
   } catch {
     return null
   }

@@ -9,6 +9,13 @@ import { Plus, Pencil, Trash2 } from "lucide-react";
 import MacroView from "@/components/MacroView";
 import MoneyInput from "@/components/ui/MoneyInput";
 import MonthFilter, { applyMonthFilter, type MonthFilterValue } from "@/components/ui/MonthFilter";
+import ComboboxCategoria from "@/components/ui/ComboboxCategoria";
+import ExportButton from "@/components/ui/ExportButton";
+import { exportPDF, exportExcel } from "@/lib/export";
+import ImportModal from "@/components/ImportModal";
+import UpgradeModal from "@/components/UpgradeModal";
+import { useCurrentUser } from "@/lib/auth";
+import { Upload } from "lucide-react";
 
 type Tab = "receitas" | "macro";
 
@@ -16,10 +23,50 @@ export default function ReceitasPage() {
   const [tab, setTab] = useState<Tab>("receitas");
   const allReceitas = useStore((s) => s.receitas);
   const receitas = allReceitas;
+  const user = useCurrentUser();
   const [pendingEdit, setPendingEdit] = useState<Receita | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
   return (
     <div className="space-y-6">
-      <PageHeader title="Receitas" subtitle="Movimentações de entrada" />
+      <PageHeader title="Receitas" subtitle="Movimentações de entrada" action={
+        <div className="flex items-center gap-2">
+        <button className="btn btn-soft" onClick={() => {
+          if (user && user.plano === "Free") setUpgradeOpen(true);
+          else setImportOpen(true);
+        }}>
+          <Upload size={15} /> Importar
+        </button>
+        <ExportButton
+          onExportPDF={() => exportPDF({
+            title: "Receitas",
+            columns: [
+              { header: "Fonte", key: "fonte" },
+              { header: "Categoria", key: "categoria" },
+              { header: "Mês Ref", key: "mesRef" },
+              { header: "Recorrência", key: "recorrencia" },
+              { header: "Valor", key: "valor", format: "brl" },
+            ],
+            rows: receitas,
+            totals: { valor: receitas.reduce((s, r) => s + r.valor, 0) },
+            filename: `nordicash-receitas-${new Date().toISOString().slice(0, 7)}`,
+          })}
+          onExportExcel={() => exportExcel({
+            title: "Receitas",
+            columns: [
+              { header: "Fonte", key: "fonte" },
+              { header: "Categoria", key: "categoria" },
+              { header: "Mês Ref", key: "mesRef" },
+              { header: "Recorrência", key: "recorrencia" },
+              { header: "Valor", key: "valor", format: "brl" },
+            ],
+            rows: receitas,
+            totals: { valor: receitas.reduce((s, r) => s + r.valor, 0) },
+            filename: `nordicash-receitas-${new Date().toISOString().slice(0, 7)}`,
+          })}
+        />
+        </div>
+      } />
       <div className="flex border-b border-border">
         {[
           { k: "receitas", l: "Lançamentos" },
@@ -39,15 +86,17 @@ export default function ReceitasPage() {
       {tab === "receitas" && <ReceitasTab pendingEdit={pendingEdit} clearPendingEdit={() => setPendingEdit(null)} />}
       {tab === "macro" && (
         <MacroView
-          items={receitas as any}
+          items={receitas}
           groupBy="fonte"
           colorTotal="text-success"
           onEditGroup={(key, mode) => {
-            const found = receitas.find((r) => String((r as any)[mode]) === key);
+            const found = receitas.find((r) => String(r[mode as keyof typeof r]) === key);
             if (found) { setPendingEdit(found); setTab("receitas"); }
           }}
         />
       )}
+      <ImportModal open={importOpen} onClose={() => setImportOpen(false)} />
+      <UpgradeModal open={upgradeOpen} onClose={() => setUpgradeOpen(false)} reason="A importação de extratos está disponível nos planos Pro e Premium." />
     </div>
   );
 }
@@ -146,6 +195,9 @@ function ReceitaModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editing]);
 
+  const { receitas: allRec } = useStore();
+  const categoriasExistentes = Array.from(new Set(allRec.map((r) => r.categoria).filter(Boolean))).sort();
+
   return (
     <Modal open={open} onClose={onClose} title={editing ? "Editar receita" : "Nova receita"}>
       <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); onSave(f); }}>
@@ -156,7 +208,12 @@ function ReceitaModal({
           </div>
           <div>
             <label className="label">Categoria</label>
-            <input className="input" required value={f.categoria} onChange={(e) => setF({ ...f, categoria: e.target.value })} />
+            <ComboboxCategoria
+              value={f.categoria}
+              onChange={(v) => setF({ ...f, categoria: v })}
+              options={categoriasExistentes}
+              required
+            />
           </div>
           <div>
             <label className="label">Valor</label>
@@ -175,7 +232,7 @@ function ReceitaModal({
           </div>
           <div className="col-span-2">
             <label className="label">Recorrência</label>
-            <select className="select" value={f.recorrencia} onChange={(e) => setF({ ...f, recorrencia: e.target.value as any })}>
+            <select className="select" value={f.recorrencia} onChange={(e) => setF({ ...f, recorrencia: e.target.value as Receita["recorrencia"] })}>
               <option value="Mensal">Mensal</option>
               <option value="Única">Única</option>
             </select>

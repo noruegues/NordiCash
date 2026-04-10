@@ -39,9 +39,46 @@ html.light .text-zinc-200 { color: #1E293B !important; }
 html.light .text-zinc-300 { color: #334155 !important; }
 html.light .text-zinc-400 { color: #475569 !important; }
 html.light .text-zinc-500 { color: #64748B !important; }
+html.light .text-zinc-600 { color: #94A3B8 !important; }
 html.light .input, html.light .select, html.light .textarea { background-color: #F8FAFC !important; color: #0F172A !important; border-color: #E2E8F0 !important; }
-html.light .card { box-shadow: 0 1px 3px rgba(15,23,42,0.06), 0 1px 2px rgba(15,23,42,0.04); }
+html.light .card { background-color: #FFFFFF !important; border-color: #E2E8F0 !important; box-shadow: 0 1px 3px rgba(15,23,42,0.06), 0 1px 2px rgba(15,23,42,0.04) !important; }
+html.light .card-title { color: #0F172A !important; }
+html.light .card-header { border-color: #E2E8F0 !important; }
+
+/* Sidebar & topbar light */
+html.light .shadow-soft { box-shadow: 0 1px 3px rgba(15,23,42,0.06), 0 4px 16px -8px rgba(15,23,42,0.08) !important; }
+html.light .shadow-glow { box-shadow: 0 0 40px -10px rgba(59,130,246,0.2) !important; }
+
+/* Buttons light */
+html.light .btn-ghost { border-color: #E2E8F0 !important; color: #475569 !important; }
+html.light .btn-ghost:hover { background-color: #F1F5F9 !important; color: #0F172A !important; }
+
+/* Pills light */
+html.light .pill-muted { background-color: #F1F5F9 !important; color: #475569 !important; border-color: #E2E8F0 !important; }
+
+/* Table light */
+html.light table.t th { color: #64748B !important; border-color: #E2E8F0 !important; }
+html.light table.t td { color: #1E293B !important; border-color: rgba(226,232,240,0.7) !important; }
+html.light table.t tr:hover td { background-color: #F8FAFC !important; }
+
+/* Modal light */
+html.light .modal-backdrop { background: rgba(15,23,42,0.3) !important; }
+html.light .modal-panel { background-color: #FFFFFF !important; border-color: #E2E8F0 !important; }
+
+/* Hover states light */
+html.light .hover\:bg-surface2:hover { background-color: #F1F5F9 !important; }
+html.light .hover\:text-zinc-100:hover { color: #0F172A !important; }
+html.light .hover\:text-zinc-200:hover { color: #1E293B !important; }
+
+/* Alert card light */
+html.light .border-danger\/40 { border-color: rgba(239,68,68,0.3) !important; }
+
+/* Gradient backgrounds light */
+html.light .bg-gradient-to-r.from-primary { background-image: linear-gradient(to right, #3B82F6, #22D3EE) !important; }
+
+/* Scrollbar light */
 html.light ::-webkit-scrollbar-thumb { background: #CBD5E1; }
+html.light ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
 
 /* Card */
 .card {
@@ -115,6 +152,21 @@ table.t tr:hover td { @apply bg-surface2/50; }
 }
 @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
 @keyframes slideUp { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: none } }
+
+/* Auth forms on Landing Page (always light) */
+.auth-light .input, .auth-light .select, .auth-light .textarea {
+  background-color: #F8FAFC !important; color: #0F172A !important; border-color: #E2E8F0 !important;
+}
+.auth-light .input:focus, .auth-light .select:focus, .auth-light .textarea:focus {
+  border-color: rgba(59,130,246,0.5) !important;
+}
+.auth-light .label { color: #475569 !important; }
+.auth-light .text-zinc-300 { color: #334155 !important; }
+.auth-light .text-zinc-400 { color: #475569 !important; }
+.auth-light .text-zinc-500 { color: #64748B !important; }
+.auth-light .border-border { border-color: #E2E8F0 !important; }
+.auth-light .bg-surface2 { background-color: #F1F5F9 !important; }
+.auth-light .btn-primary { background-color: #3B82F6 !important; }
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 8px; height: 8px; }

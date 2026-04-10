@@ -11,6 +11,8 @@ import { projecaoInvestimento, projecaoPortfolio } from "@/lib/calculations";
 import { brl, dataBR } from "@/lib/format";
 import { LineChart, Plus, Pencil, Trash2, RefreshCw, Info } from "lucide-react";
 import { useIndicadores } from "@/lib/indicadores";
+import ExportButton from "@/components/ui/ExportButton";
+import { exportPDF, exportExcel } from "@/lib/export";
 
 const HORIZONTES = [
   { label: "6m", v: 6 }, { label: "1a", v: 12 }, { label: "3a", v: 36 },
@@ -68,9 +70,33 @@ export default function InvestimentosPage() {
         title="Investimentos"
         subtitle="Portfólio"
         action={
-          <button className="btn btn-primary" onClick={() => { setEditing(null); setOpen(true); }}>
-            <Plus size={16} /> Novo investimento
-          </button>
+          <div className="flex items-center gap-2">
+            <ExportButton
+              onExportPDF={() => exportPDF({
+                title: "Investimentos", columns: [
+                  { header: "Nome", key: "nome" }, { header: "Tipo", key: "tipo" },
+                  { header: "Valor Inicial", key: "valorInicial", format: "brl" },
+                  { header: "Aporte Mensal", key: "aporteMensal", format: "brl" },
+                  { header: "Saldo Atual", key: "saldoAtual", format: "brl" },
+                ],
+                rows: investimentos, totals: { saldoAtual: investimentos.reduce((s, i) => s + i.saldoAtual, 0) },
+                filename: `nordicash-investimentos-${new Date().toISOString().slice(0, 7)}`,
+              })}
+              onExportExcel={() => exportExcel({
+                title: "Investimentos", columns: [
+                  { header: "Nome", key: "nome" }, { header: "Tipo", key: "tipo" },
+                  { header: "Valor Inicial", key: "valorInicial", format: "brl" },
+                  { header: "Aporte Mensal", key: "aporteMensal", format: "brl" },
+                  { header: "Saldo Atual", key: "saldoAtual", format: "brl" },
+                ],
+                rows: investimentos, totals: { saldoAtual: investimentos.reduce((s, i) => s + i.saldoAtual, 0) },
+                filename: `nordicash-investimentos-${new Date().toISOString().slice(0, 7)}`,
+              })}
+            />
+            <button className="btn btn-primary" onClick={() => { setEditing(null); setOpen(true); }}>
+              <Plus size={16} /> Novo investimento
+            </button>
+          </div>
         }
       />
 
@@ -227,7 +253,7 @@ function InvModal({
           </div>
           <div>
             <label className="label">Tipo</label>
-            <select className="select" value={f.tipo} onChange={(e) => setF({ ...f, tipo: e.target.value as any })}>
+            <select className="select" value={f.tipo} onChange={(e) => setF({ ...f, tipo: e.target.value as Investimento["tipo"] })}>
               <option>Renda Fixa</option><option>Tesouro</option><option>Ações</option>
               <option>FIIs</option><option>Cripto</option><option>Fundo</option>
             </select>

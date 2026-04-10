@@ -124,7 +124,7 @@ export const useAuth = create<AuthState>()(
 
       setTheme: (t) => {
         set({ theme: t });
-        get().updateProfile({ theme: t } as any);
+        get().updateProfile({ theme: t } as Partial<User>);
         if (typeof document !== "undefined") {
           document.documentElement.classList.toggle("light", t === "light");
         }
@@ -137,7 +137,7 @@ export const useAuth = create<AuthState>()(
 
       dismissWelcome: async () => {
         set({ showWelcome: false });
-        await get().updateProfile({ welcomeSeen: true } as any);
+        await get().updateProfile({ welcomeSeen: true } as Partial<User>);
       },
     }),
     {

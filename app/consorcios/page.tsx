@@ -3,14 +3,14 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import PageHeader from "@/components/ui/PageHeader";
 import Modal from "@/components/ui/Modal";
-import { useStore, type Consorcio, type StatusParcela } from "@/lib/store";
+import { useStore, gerarParcelas, type Consorcio, type StatusParcela } from "@/lib/store";
 import { consorcioStats } from "@/lib/calculations";
 import { brl, dataBR } from "@/lib/format";
 import { Plus, Pencil, Trash2, Check, X } from "lucide-react";
 import MoneyInput from "@/components/ui/MoneyInput";
 
 export default function ConsorciosPage() {
-  const { consorcios, contas, addConsorcio, updateConsorcio, removeConsorcio, updateParcela, desmarcarContempladosTodos } = useStore();
+  const { consorcios, contas, addConsorcio, updateConsorcio, removeConsorcio, updateParcela, marcarContemplado, desmarcarContempladosTodos } = useStore();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Consorcio | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -109,7 +109,17 @@ export default function ConsorciosPage() {
                           </td>
                           <td>
                             <label className="inline-flex items-center gap-2 text-xs">
-                              <input type="checkbox" checked={p.contemplado} onChange={(e) => updateParcela(c.id, p.numero, { contemplado: e.target.checked })} />
+                              <input
+                                type="checkbox"
+                                checked={p.contemplado}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    marcarContemplado(c.id, p.numero);
+                                  } else {
+                                    updateParcela(c.id, p.numero, { contemplado: false });
+                                  }
+                                }}
+                              />
                               Sim
                             </label>
                           </td>
@@ -218,7 +228,7 @@ function ConsorcioModal({
 }: {
   open: boolean; onClose: () => void; editing: Consorcio | null;
   contas: { id: string; nome: string }[];
-  onSave: (c: Omit<Consorcio, "id" | "parcelas">) => void;
+  onSave: (c: Omit<Consorcio, "id">) => void;
 }) {
   const empty: Omit<Consorcio, "id" | "parcelas"> = {
     bem: "", administradora: "", valorCarta: 0, prazoMeses: 60, parcelaCheia: 0,
@@ -253,8 +263,8 @@ function ConsorcioModal({
       <form className="space-y-4" onSubmit={(e) => {
         e.preventDefault();
         // grava a taxa calculada automaticamente
-        const data = { ...f, taxaAdmin: Number(taxaAdminCalc.toFixed(2)) };
-        onSave(data);
+        const base = { ...f, taxaAdmin: Number(taxaAdminCalc.toFixed(2)) };
+        onSave({ ...base, parcelas: gerarParcelas(base) });
       }}>
         <div className="grid grid-cols-2 gap-3">
           <div>

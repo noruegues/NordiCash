@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireAuth, handleError } from '@/lib/api-helpers'
+import { requireAuth, handleError, pick } from '@/lib/api-helpers'
+
+const ALLOWED_FIELDS = ['fonte', 'categoria', 'valor', 'contaId', 'mesRef', 'recorrencia']
 
 export async function GET() {
   try {
@@ -13,8 +15,8 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const session = await requireAuth()
-    const data = await req.json()
-    const receita = await prisma.receita.create({ data: { ...data, userId: session.userId } })
+    const data = pick(await req.json(), ALLOWED_FIELDS)
+    const receita = await prisma.receita.create({ data: { ...data, userId: session.userId } as any })
     return NextResponse.json(receita, { status: 201 })
   } catch (e) { return handleError(e) }
 }
@@ -22,7 +24,9 @@ export async function POST(req: Request) {
 export async function PATCH(req: Request) {
   try {
     const session = await requireAuth()
-    const { id, ...data } = await req.json()
+    const body = await req.json()
+    const { id } = body
+    const data = pick(body, ALLOWED_FIELDS)
     await prisma.receita.updateMany({ where: { id, userId: session.userId }, data })
     const updated = await prisma.receita.findFirst({ where: { id, userId: session.userId } })
     return NextResponse.json(updated)

@@ -29,7 +29,7 @@ export async function POST(req: Request) {
     res.cookies.set('token', token, { httpOnly: true, secure: true, sameSite: 'lax', maxAge: 7 * 24 * 60 * 60, path: '/' })
     return res
   } catch (e: any) {
-    console.error('Signup error:', e)
-    return NextResponse.json({ error: e.message || 'Erro interno' }, { status: 500 })
+    if (process.env.NODE_ENV === 'development') console.error('Signup error:', e)
+    return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
   }
 }

@@ -59,30 +59,59 @@ export default function Dashboard() {
   const saldo = totalReceita - totalDespesa;
   const totalInv = investimentos.reduce((s, i) => s + i.saldoAtual, 0);
 
-  // Calcular deltas reais: mês atual vs mês anterior
-  const mesAnterior = useMemo(() => {
-    const d = new Date();
-    d.setMonth(d.getMonth() - 1);
-    return d.toISOString().slice(0, 7);
-  }, []);
+  // Calcular deltas: compara período atual com período anterior de mesma duração
+  const { deltaReceita, deltaDespesa, deltaSaldo, deltaInv, deltaLabel } = useMemo(() => {
+    function calcDelta(atual: number, anterior: number): number | undefined {
+      if (anterior === 0 && atual === 0) return undefined;
+      if (anterior === 0) return atual > 0 ? 100 : -100;
+      return ((atual - anterior) / Math.abs(anterior)) * 100;
+    }
 
-  const recMesAtual = receitas.filter((r) => r.mesRef === mesAtual).reduce((s, r) => s + r.valor, 0);
-  const recMesAnterior = receitas.filter((r) => r.mesRef === mesAnterior).reduce((s, r) => s + r.valor, 0);
-  const desMesAtual = despesas.filter((d) => d.mesRef === mesAtual).reduce((s, d) => s + d.valor, 0);
-  const desMesAnterior = despesas.filter((d) => d.mesRef === mesAnterior).reduce((s, d) => s + d.valor, 0);
-  const saldoMesAtual = recMesAtual - desMesAtual;
-  const saldoMesAnterior = recMesAnterior - desMesAnterior;
+    // Coleta meses únicos do período filtrado, ordenados
+    const mesesRec = recF.map((r) => r.mesRef);
+    const mesesDes = desF.map((d) => d.mesRef);
+    const mesesPeriodo = [...new Set([...mesesRec, ...mesesDes])].sort();
 
-  function calcDelta(atual: number, anterior: number): number | undefined {
-    if (anterior === 0 && atual === 0) return undefined;
-    if (anterior === 0) return atual > 0 ? 100 : -100;
-    return ((atual - anterior) / Math.abs(anterior)) * 100;
-  }
+    if (mesesPeriodo.length === 0) return { deltaReceita: undefined, deltaDespesa: undefined, deltaSaldo: undefined, deltaInv: undefined, deltaLabel: "" };
 
-  const deltaReceita = calcDelta(recMesAtual, recMesAnterior);
-  const deltaDespesa = calcDelta(desMesAtual, desMesAnterior);
-  const deltaSaldo = calcDelta(saldoMesAtual, saldoMesAnterior);
-  const deltaInv = undefined; // investimentos não têm comparação mensal simples
+    // Se período = 1 mês, compara com mês anterior
+    // Se período = N meses, divide ao meio e compara primeira metade vs segunda metade
+    if (mesesPeriodo.length === 1) {
+      const mes = mesesPeriodo[0];
+      const d = new Date(mes + "-01");
+      d.setMonth(d.getMonth() - 1);
+      const mesAnt = d.toISOString().slice(0, 7);
+      const recAtual = receitas.filter((r) => r.mesRef === mes).reduce((s, r) => s + r.valor, 0);
+      const recAnterior = receitas.filter((r) => r.mesRef === mesAnt).reduce((s, r) => s + r.valor, 0);
+      const desAtual = despesas.filter((dd) => dd.mesRef === mes).reduce((s, dd) => s + dd.valor, 0);
+      const desAnterior = despesas.filter((dd) => dd.mesRef === mesAnt).reduce((s, dd) => s + dd.valor, 0);
+      return {
+        deltaReceita: calcDelta(recAtual, recAnterior),
+        deltaDespesa: calcDelta(desAtual, desAnterior),
+        deltaSaldo: calcDelta(recAtual - desAtual, recAnterior - desAnterior),
+        deltaInv: undefined,
+        deltaLabel: "vs mês anterior",
+      };
+    }
+
+    // Múltiplos meses: segunda metade vs primeira metade
+    const mid = Math.floor(mesesPeriodo.length / 2);
+    const firstHalf = mesesPeriodo.slice(0, mid);
+    const secondHalf = mesesPeriodo.slice(mid);
+
+    const recFirst = recF.filter((r) => firstHalf.includes(r.mesRef)).reduce((s, r) => s + r.valor, 0);
+    const recSecond = recF.filter((r) => secondHalf.includes(r.mesRef)).reduce((s, r) => s + r.valor, 0);
+    const desFirst = desF.filter((d) => firstHalf.includes(d.mesRef)).reduce((s, d) => s + d.valor, 0);
+    const desSecond = desF.filter((d) => secondHalf.includes(d.mesRef)).reduce((s, d) => s + d.valor, 0);
+
+    return {
+      deltaReceita: calcDelta(recSecond, recFirst),
+      deltaDespesa: calcDelta(desSecond, desFirst),
+      deltaSaldo: calcDelta(recSecond - desSecond, recFirst - desFirst),
+      deltaInv: undefined,
+      deltaLabel: `2ª metade vs 1ª metade`,
+    };
+  }, [recF, desF, receitas, despesas]);
 
   const porCategoria = Object.entries(
     desF.reduce<Record<string, number>>((acc, d) => {
@@ -91,16 +120,27 @@ export default function Dashboard() {
     }, {})
   ).map(([name, value]) => ({ name, value }));
 
-  // Fluxo agregado por mês
-  const fluxoMap = new Map<string, { receita: number; despesa: number }>();
-  recF.forEach((r) => {
-    const cur = fluxoMap.get(r.mesRef) || { receita: 0, despesa: 0 };
-    cur.receita += r.valor;
+  // Fluxo agregado por mês — usa TODAS as receitas/despesas (incluindo futuras) filtradas só pelo período
+  const allRecPeriodo = useMemo(
+    () => receitas.filter((r) => inPeriodo(r.mesRef, periodo, custom)),
+    [receitas, periodo, custom]
+  );
+  const allDesPeriodo = useMemo(
+    () => despesas.filter((d) => inPeriodo(d.mesRef, periodo, custom)),
+    [despesas, periodo, custom]
+  );
+  const emptyFluxo = () => ({ receitaRecebida: 0, receitaProv: 0, despesaPaga: 0, despesaProv: 0 });
+  const fluxoMap = new Map<string, ReturnType<typeof emptyFluxo>>();
+  allRecPeriodo.forEach((r) => {
+    const cur = fluxoMap.get(r.mesRef) || emptyFluxo();
+    if (r.mesRef <= mesAtual) cur.receitaRecebida += r.valor;
+    else cur.receitaProv += r.valor;
     fluxoMap.set(r.mesRef, cur);
   });
-  desF.forEach((d) => {
-    const cur = fluxoMap.get(d.mesRef) || { receita: 0, despesa: 0 };
-    cur.despesa += d.valor;
+  allDesPeriodo.forEach((d) => {
+    const cur = fluxoMap.get(d.mesRef) || emptyFluxo();
+    if (d.pago) cur.despesaPaga += d.valor;
+    else cur.despesaProv += d.valor;
     fluxoMap.set(d.mesRef, cur);
   });
   const fluxo = Array.from(fluxoMap.entries())
@@ -152,9 +192,9 @@ export default function Dashboard() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard label="Receitas" value={brl(totalReceita)} delta={deltaReceita} icon={<TrendingUp size={18} />} accent />
-        <KpiCard label="Despesas" value={brl(totalDespesa)} delta={deltaDespesa} icon={<TrendingDown size={18} />} />
-        <KpiCard label="Saldo" value={brl(saldo)} delta={deltaSaldo} icon={<Wallet size={18} />} />
+        <KpiCard label="Receitas" value={brl(totalReceita)} delta={deltaReceita} deltaLabel={deltaLabel} icon={<TrendingUp size={18} />} accent />
+        <KpiCard label="Despesas" value={brl(totalDespesa)} delta={deltaDespesa} deltaLabel={deltaLabel} icon={<TrendingDown size={18} />} />
+        <KpiCard label="Saldo" value={brl(saldo)} delta={deltaSaldo} deltaLabel={deltaLabel} icon={<Wallet size={18} />} />
         <KpiCard label="Investimentos" value={brl(totalInv)} delta={deltaInv} icon={<LineChart size={18} />} />
       </div>
 

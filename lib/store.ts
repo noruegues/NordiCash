@@ -4,7 +4,7 @@ import { create } from "zustand";
 // ===== Types =====
 export type Bandeira = "Visa" | "Mastercard" | "Elo" | "Amex" | "Hipercard";
 export type FormaPagamento = "Pix" | "Débito" | "Dinheiro" | "Boleto" | "Cartão";
-export type RecorrenciaTipo = "Única" | "Periódica" | "Indeterminada";
+export type RecorrenciaTipo = "Única" | "Recorrente" | "Indeterminada";
 export type StatusParcela = "Pago" | "Pendente" | "Futuro";
 
 export type ContaBancaria = {
@@ -110,6 +110,10 @@ async function api<T>(url: string, method = "GET", body?: unknown): Promise<T> {
   const opts: RequestInit = { method, headers: { "Content-Type": "application/json" } };
   if (body) opts.body = JSON.stringify(body);
   const res = await fetch(url, opts);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Erro de rede" }));
+    throw new Error(err.error || `Erro ${res.status}`);
+  }
   return res.json();
 }
 
@@ -143,6 +147,7 @@ type State = {
   updateCartao: (id: string, c: Partial<Cartao>) => Promise<void>;
   removeCartao: (id: string) => Promise<void>;
   marcarFaturaPaga: (id: string, mes: string) => Promise<void>;
+  desmarcarFaturaPaga: (id: string, mes: string) => Promise<void>;
 
   addInvestimento: (i: Omit<Investimento, "id">) => Promise<void>;
   updateInvestimento: (id: string, i: Partial<Investimento>) => Promise<void>;
@@ -152,6 +157,7 @@ type State = {
   updateConsorcio: (id: string, c: Partial<Consorcio>) => Promise<void>;
   removeConsorcio: (id: string) => Promise<void>;
   updateParcela: (consorcioId: string, numero: number, p: Partial<ParcelaConsorcio>) => void;
+  marcarContemplado: (consorcioId: string, parcelaNumero: number) => void;
   desmarcarContempladosTodos: (consorcioId: string) => void;
 
   addBem: (b: Omit<Bem, "id">) => Promise<void>;
@@ -170,7 +176,7 @@ export const useStore = create<State>()((set, get) => ({
   loaded: false,
 
   loadAll: async () => {
-    const [contas, receitas, despesas, cartoes, investimentos, consorcios, bens] = await Promise.all([
+    const [contas, receitas, despesas, cartoes, investimentos, rawConsorcios, bens] = await Promise.all([
       api<ContaBancaria[]>("/api/contas"),
       api<Receita[]>("/api/receitas"),
       api<Despesa[]>("/api/despesas"),
@@ -179,6 +185,14 @@ export const useStore = create<State>()((set, get) => ({
       api<Consorcio[]>("/api/consorcios"),
       api<Bem[]>("/api/bens"),
     ]);
+    // Normaliza parcelas: Prisma retorna paga (boolean), frontend usa status (string)
+    const consorcios = rawConsorcios.map((c) => ({
+      ...c,
+      parcelas: c.parcelas.map((p) => ({
+        ...p,
+        status: p.status ?? (p.paga ? "Pago" : "Pendente") as StatusParcela,
+      })),
+    }));
     set({ contas, receitas, despesas, cartoes, investimentos, consorcios, bens, loaded: true });
   },
 
@@ -240,8 +254,28 @@ export const useStore = create<State>()((set, get) => ({
     set((s) => ({ cartoes: s.cartoes.filter((x) => x.id !== id) }));
   },
   marcarFaturaPaga: async (id, mes) => {
+    // 1. Marca o cartão
     await api("/api/cartoes", "PATCH", { id, faturaPagaMes: mes });
     set((s) => ({ cartoes: s.cartoes.map((x) => (x.id === id ? { ...x, faturaPagaMes: mes } : x)) }));
+    // 2. Marca todas as despesas desse cartão/mês como pagas
+    await api("/api/despesas", "PATCH", { bulk: true, cartaoId: id, mesRef: mes, data: { pago: true } });
+    set((s) => ({
+      despesas: s.despesas.map((d) =>
+        d.cartaoId === id && d.mesRef === mes ? { ...d, pago: true } : d
+      ),
+    }));
+  },
+  desmarcarFaturaPaga: async (id, mes) => {
+    // 1. Limpa o cartão
+    await api("/api/cartoes", "PATCH", { id, faturaPagaMes: null });
+    set((s) => ({ cartoes: s.cartoes.map((x) => (x.id === id ? { ...x, faturaPagaMes: undefined } : x)) }));
+    // 2. Desmarca as despesas desse cartão/mês
+    await api("/api/despesas", "PATCH", { bulk: true, cartaoId: id, mesRef: mes, data: { pago: false } });
+    set((s) => ({
+      despesas: s.despesas.map((d) =>
+        d.cartaoId === id && d.mesRef === mes ? { ...d, pago: false } : d
+      ),
+    }));
   },
 
   // Investimentos
@@ -272,29 +306,112 @@ export const useStore = create<State>()((set, get) => ({
     set((s) => ({ consorcios: s.consorcios.filter((x) => x.id !== id) }));
   },
   updateParcela: (consorcioId, numero, p) => {
+    // Se mudou status, sincroniza paga
+    const patch = { ...p };
+    if (patch.status) {
+      patch.paga = patch.status === "Pago";
+    }
     set((s) => ({
       consorcios: s.consorcios.map((c) => {
         if (c.id !== consorcioId) return c;
-        return { ...c, parcelas: c.parcelas.map((pp) => (pp.numero === numero ? { ...pp, ...p } : pp)) };
+        return { ...c, parcelas: c.parcelas.map((pp) => (pp.numero === numero ? { ...pp, ...patch } : pp)) };
       }),
     }));
+    // Sync to API — status é fonte de verdade para paga
+    const consorcio = get().consorcios.find((c) => c.id === consorcioId);
+    if (consorcio) {
+      const parcelasApi = consorcio.parcelas.map((pp) => ({
+        numero: pp.numero,
+        mesRef: pp.mesRef ?? "",
+        valor: pp.valor,
+        paga: pp.status === "Pago",
+      }));
+      api("/api/consorcios", "PATCH", { id: consorcioId, parcelas: parcelasApi }).catch(() => {});
+    }
+  },
+  marcarContemplado: (consorcioId, parcelaNumero) => {
+    set((s) => ({
+      consorcios: s.consorcios.map((c) => {
+        if (c.id !== consorcioId) return c;
+
+        // Calcula saldo devedor no momento da contemplação
+        const totalDevido = c.valorCarta * (1 + c.taxaAdmin / 100);
+        const totalPagoAteAgora = c.parcelas
+          .filter((p) => p.numero < parcelaNumero)
+          .reduce((sum, p) => sum + p.valor, 0);
+        // Inclui o valor da própria parcela contemplada como "paga"
+        const parcelaContemplada = c.parcelas.find((p) => p.numero === parcelaNumero);
+        const totalPago = totalPagoAteAgora + (parcelaContemplada?.valor ?? 0);
+        const saldoDevedor = Math.max(0, totalDevido - totalPago);
+
+        // Parcelas restantes = após a parcela contemplada
+        const parcelasRestantes = c.parcelas.filter((p) => p.numero > parcelaNumero).length;
+        const parcelaCheia = parcelasRestantes > 0 ? saldoDevedor / parcelasRestantes : 0;
+
+        const newParcelas = c.parcelas.map((p) => {
+          if (p.numero < parcelaNumero) {
+            // Anteriores: marcar como pagas
+            return { ...p, status: "Pago" as const, paga: true };
+          }
+          if (p.numero === parcelaNumero) {
+            // A parcela contemplada: marcar como paga e contemplada
+            return { ...p, status: "Pago" as const, paga: true, contemplado: true };
+          }
+          // Futuras: marcar como contemplado + recalcular valor (parcela cheia)
+          return { ...p, contemplado: true, valor: Math.round(parcelaCheia * 100) / 100 };
+        });
+
+        return { ...c, contemplado: true, parcelas: newParcelas };
+      }),
+    }));
+
     // Sync to API
     const consorcio = get().consorcios.find((c) => c.id === consorcioId);
-    if (consorcio) api("/api/consorcios", "PATCH", { id: consorcioId, parcelas: consorcio.parcelas });
+    if (consorcio) {
+      const parcelasApi = consorcio.parcelas.map((pp) => ({
+        numero: pp.numero,
+        mesRef: pp.mesRef ?? "",
+        valor: pp.valor,
+        paga: pp.status === "Pago",
+      }));
+      api("/api/consorcios", "PATCH", {
+        id: consorcioId,
+        contemplado: true,
+        parcelas: parcelasApi,
+      }).catch(() => {});
+    }
   },
+
   desmarcarContempladosTodos: (consorcioId) => {
     set((s) => ({
       consorcios: s.consorcios.map((c) => {
         if (c.id !== consorcioId) return c;
+        // Recalcula valor com desconto (parcela reduzida)
+        const reducao = c.pagamentoReduzido === false ? 1 : (c.percentualReducao ?? 0.5);
+        const valorReduzido = Math.round(c.parcelaCheia * reducao * 100) / 100;
         return {
           ...c,
           contemplado: false,
-          parcelas: c.parcelas.map((p) => ({ ...p, contemplado: false })),
+          parcelas: c.parcelas.map((p) => {
+            // Parcelas que estavam contempladas e não foram pagas: voltam ao valor reduzido
+            if (p.contemplado && p.status !== "Pago") {
+              return { ...p, contemplado: false, valor: valorReduzido };
+            }
+            return { ...p, contemplado: false };
+          }),
         };
       }),
     }));
     const consorcio = get().consorcios.find((c) => c.id === consorcioId);
-    if (consorcio) api("/api/consorcios", "PATCH", { id: consorcioId, contemplado: false, parcelas: consorcio.parcelas });
+    if (consorcio) {
+      const parcelasApi = consorcio.parcelas.map((pp) => ({
+        numero: pp.numero,
+        mesRef: pp.mesRef ?? "",
+        valor: pp.valor,
+        paga: pp.status === "Pago",
+      }));
+      api("/api/consorcios", "PATCH", { id: consorcioId, contemplado: false, parcelas: parcelasApi }).catch(() => {});
+    }
   },
 
   // Bens
