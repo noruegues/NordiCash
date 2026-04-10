@@ -8,6 +8,7 @@ export default function LoginForm({ onSwitch, onBack }: { onSwitch: () => void; 
   const [usuario, setUsuario] = useState("");
   const [senha, setSenha] = useState("");
   const [err, setErr] = useState("");
+  const [loading, setLoading] = useState(false);
 
   return (
     <div className="w-full max-w-sm">
@@ -19,10 +20,12 @@ export default function LoginForm({ onSwitch, onBack }: { onSwitch: () => void; 
 
       <form
         className="mt-6 space-y-4"
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
           setErr("");
-          const r = login(usuario, senha);
+          setLoading(true);
+          const r = await login(usuario, senha);
+          setLoading(false);
           if (!r.ok) setErr(r.error ?? "Erro");
         }}
       >
@@ -35,12 +38,10 @@ export default function LoginForm({ onSwitch, onBack }: { onSwitch: () => void; 
           <input type="password" className="input" value={senha} onChange={(e) => setSenha(e.target.value)} placeholder="••••••" />
         </div>
         {err && <div className="text-xs text-danger bg-danger/10 border border-danger/20 rounded p-2">{err}</div>}
-        <button type="submit" className="btn btn-primary w-full">Entrar</button>
+        <button type="submit" className="btn btn-primary w-full" disabled={loading}>
+          {loading ? "Entrando..." : "Entrar"}
+        </button>
       </form>
-
-      <div className="mt-5 text-xs text-zinc-500 bg-surface2 border border-border rounded p-3">
-        💡 <strong>Conta de teste:</strong> usuário <code className="text-primary">victor</code> · senha <code className="text-primary">1234</code>
-      </div>
 
       <div className="mt-6 text-center text-sm text-zinc-400">
         Não tem conta?{" "}

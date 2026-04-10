@@ -6,24 +6,32 @@ import Landing from "@/components/auth/Landing";
 import Sidebar from "@/components/layout/Sidebar";
 import Topbar from "@/components/layout/Topbar";
 import WelcomePopup from "@/components/WelcomePopup";
+import AvisosPopup from "@/components/AvisosPopup";
 
 export default function AuthGate({ children }: { children: React.ReactNode }) {
-  const currentLogin = useAuth((s) => s.currentLogin);
-  const setUser = useStore((s) => s.setUser);
+  const user = useAuth((s) => s.user);
+  const loading = useAuth((s) => s.loading);
+  const fetchMe = useAuth((s) => s.fetchMe);
+  const loadAll = useStore((s) => s.loadAll);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => setHydrated(true), []);
 
-  // Sincroniza o store de dados com o usuário logado
+  // Ao montar, verifica sessão no servidor
   useEffect(() => {
-    setUser(currentLogin);
-  }, [currentLogin, setUser]);
+    fetchMe();
+  }, [fetchMe]);
 
-  if (!hydrated) {
+  // Quando usuário loga, carrega dados do banco
+  useEffect(() => {
+    if (user) loadAll();
+  }, [user, loadAll]);
+
+  if (!hydrated || loading) {
     return <div className="min-h-screen bg-bg" />;
   }
 
-  if (!currentLogin) return <Landing />;
+  if (!user) return <Landing />;
 
   return <Shell>{children}</Shell>;
 }
@@ -38,6 +46,7 @@ function Shell({ children }: { children: React.ReactNode }) {
         <main className="p-3 sm:p-6 max-w-[1600px] mx-auto">{children}</main>
       </div>
       <WelcomePopup />
+      <AvisosPopup />
     </div>
   );
 }

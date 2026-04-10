@@ -5,106 +5,126 @@ import { persist } from "zustand/middleware";
 export type Plano = "Free" | "Pro" | "Premium";
 
 export type User = {
+  id: string;
   login: string;
-  senha: string;
   nome: string;
   email?: string;
-  avatar?: string; // dataURL
+  avatar?: string;
   plano: Plano;
+  isAdmin: boolean;
+  theme: string;
+  welcomeSeen: boolean;
   createdAt: string;
-  welcomeSeen?: boolean;
 };
 
 type AuthState = {
-  users: User[];
-  currentLogin: string | null;
+  user: User | null;
   theme: "dark" | "light";
   showWelcome: boolean;
+  loading: boolean;
 
-  login: (login: string, senha: string) => { ok: boolean; error?: string };
-  logout: () => void;
-  signup: (data: Omit<User, "createdAt">) => { ok: boolean; error?: string };
-  updateProfile: (patch: Partial<User>) => void;
-  changePassword: (atual: string, nova: string) => { ok: boolean; error?: string };
-  changeLogin: (novo: string) => { ok: boolean; error?: string };
+  login: (login: string, senha: string) => Promise<{ ok: boolean; error?: string }>;
+  logout: () => Promise<void>;
+  signup: (data: { login: string; senha: string; nome: string; email?: string }) => Promise<{ ok: boolean; error?: string }>;
+  fetchMe: () => Promise<void>;
+  updateProfile: (patch: Partial<User>) => Promise<void>;
+  changePassword: (atual: string, nova: string) => Promise<{ ok: boolean; error?: string }>;
   setPlano: (plano: Plano) => void;
   setTheme: (t: "dark" | "light") => void;
   toggleTheme: () => void;
-  dismissWelcome: () => void;
-};
-
-const seedUser: User = {
-  login: "victor",
-  senha: "1234",
-  nome: "Victor Hugo",
-  email: "victor@nordicash.app",
-  avatar: undefined,
-  plano: "Premium",
-  createdAt: "2026-01-01",
+  dismissWelcome: () => Promise<void>;
 };
 
 export const useAuth = create<AuthState>()(
   persist(
     (set, get) => ({
-      users: [seedUser],
-      currentLogin: null,
+      user: null,
       theme: "dark",
       showWelcome: false,
+      loading: true,
 
-      login: (login, senha) => {
-        const u = get().users.find((x) => x.login === login.trim());
-        if (!u) return { ok: false, error: "Usuário não encontrado" };
-        if (u.senha !== senha) return { ok: false, error: "Senha incorreta" };
-        set({ currentLogin: u.login, showWelcome: !u.welcomeSeen });
-        return { ok: true };
-      },
-
-      logout: () => set({ currentLogin: null, showWelcome: false }),
-
-      signup: (data) => {
-        if (get().users.some((u) => u.login === data.login.trim())) {
-          return { ok: false, error: "Usuário já existe" };
+      login: async (login, senha) => {
+        try {
+          const res = await fetch("/api/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ login: login.trim(), senha }),
+          });
+          const data = await res.json();
+          if (!res.ok) return { ok: false, error: data.error };
+          set({ user: data.user, showWelcome: !data.user.welcomeSeen });
+          return { ok: true };
+        } catch {
+          return { ok: false, error: "Erro de conexão" };
         }
-        const novo: User = { ...data, createdAt: new Date().toISOString().slice(0, 10) };
-        set((s) => ({ users: [...s.users, novo], currentLogin: novo.login, showWelcome: true }));
-        return { ok: true };
       },
 
-      updateProfile: (patch) =>
-        set((s) => ({
-          users: s.users.map((u) => (u.login === s.currentLogin ? { ...u, ...patch } : u)),
-        })),
-
-      changePassword: (atual, nova) => {
-        const s = get();
-        const u = s.users.find((x) => x.login === s.currentLogin);
-        if (!u) return { ok: false, error: "Não autenticado" };
-        if (u.senha !== atual) return { ok: false, error: "Senha atual incorreta" };
-        if (!nova || nova.length < 4) return { ok: false, error: "Senha muito curta" };
-        set({ users: s.users.map((x) => (x.login === u.login ? { ...x, senha: nova } : x)) });
-        return { ok: true };
+      logout: async () => {
+        await fetch("/api/auth/logout", { method: "POST" });
+        set({ user: null, showWelcome: false });
       },
 
-      changeLogin: (novo) => {
-        const s = get();
-        if (!novo.trim()) return { ok: false, error: "Login inválido" };
-        if (s.users.some((u) => u.login === novo && u.login !== s.currentLogin)) {
-          return { ok: false, error: "Login já em uso" };
+      signup: async (data) => {
+        try {
+          const res = await fetch("/api/auth/signup", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data),
+          });
+          const result = await res.json();
+          if (!res.ok) return { ok: false, error: result.error };
+          set({ user: result.user, showWelcome: true });
+          return { ok: true };
+        } catch {
+          return { ok: false, error: "Erro de conexão" };
         }
-        set({
-          users: s.users.map((u) => (u.login === s.currentLogin ? { ...u, login: novo } : u)),
-          currentLogin: novo,
+      },
+
+      fetchMe: async () => {
+        try {
+          const res = await fetch("/api/auth/me");
+          const data = await res.json();
+          if (res.ok && data.user) {
+            set({ user: data.user, loading: false });
+          } else {
+            set({ user: null, loading: false });
+          }
+        } catch {
+          set({ user: null, loading: false });
+        }
+      },
+
+      updateProfile: async (patch) => {
+        const res = await fetch("/api/auth/me", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(patch),
         });
-        return { ok: true };
+        const data = await res.json();
+        if (res.ok) set({ user: data.user });
+      },
+
+      changePassword: async (atual, nova) => {
+        try {
+          const res = await fetch("/api/auth/password", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ atual, nova }),
+          });
+          const data = await res.json();
+          if (!res.ok) return { ok: false, error: data.error };
+          return { ok: true };
+        } catch {
+          return { ok: false, error: "Erro de conexão" };
+        }
       },
 
       setPlano: (plano) =>
-        set((s) => ({
-          users: s.users.map((u) => (u.login === s.currentLogin ? { ...u, plano } : u)),
-        })),
+        set((s) => (s.user ? { user: { ...s.user, plano } } : {})),
 
       setTheme: (t) => {
         set({ theme: t });
+        get().updateProfile({ theme: t } as any);
         if (typeof document !== "undefined") {
           document.documentElement.classList.toggle("light", t === "light");
         }
@@ -115,15 +135,15 @@ export const useAuth = create<AuthState>()(
         get().setTheme(next);
       },
 
-      dismissWelcome: () =>
-        set((s) => ({
-          showWelcome: false,
-          users: s.users.map((u) => (u.login === s.currentLogin ? { ...u, welcomeSeen: true } : u)),
-        })),
+      dismissWelcome: async () => {
+        set({ showWelcome: false });
+        await get().updateProfile({ welcomeSeen: true } as any);
+      },
     }),
     {
       name: "finance-saas-auth",
-      version: 1,
+      version: 2,
+      partialize: (state) => ({ theme: state.theme }),
       onRehydrateStorage: () => (state) => {
         if (state && typeof document !== "undefined") {
           document.documentElement.classList.toggle("light", state.theme === "light");
@@ -134,8 +154,7 @@ export const useAuth = create<AuthState>()(
 );
 
 export function useCurrentUser(): User | null {
-  const { users, currentLogin } = useAuth();
-  return users.find((u) => u.login === currentLogin) ?? null;
+  return useAuth((s) => s.user);
 }
 
 // Limites por plano

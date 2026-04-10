@@ -12,6 +12,7 @@ export default function SignupForm({ onSwitch, onBack }: { onSwitch: () => void;
 
   const [step, setStep] = useState<Step>("conta");
   const [err, setErr] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
@@ -21,7 +22,7 @@ export default function SignupForm({ onSwitch, onBack }: { onSwitch: () => void;
   const [contas, setContas] = useState<{ nome: string; banco: string; saldo: number; cor: string }[]>([]);
   const [cartoes, setCartoes] = useState<{ nome: string; banco: string; limite: number; dia: number; cor: string }[]>([]);
 
-  function handleSignup() {
+  async function handleSignup() {
     setErr("");
     if (!nome || !usuario || !senha) {
       setErr("Preencha todos os campos");
@@ -31,7 +32,9 @@ export default function SignupForm({ onSwitch, onBack }: { onSwitch: () => void;
       setErr("Senha muito curta (mín. 4 caracteres)");
       return;
     }
-    const r = signup({ nome, email, login: usuario, senha, plano: "Free" });
+    setLoading(true);
+    const r = await signup({ nome, email, login: usuario, senha });
+    setLoading(false);
     if (!r.ok) {
       setErr(r.error ?? "Erro");
       return;
@@ -39,13 +42,15 @@ export default function SignupForm({ onSwitch, onBack }: { onSwitch: () => void;
     setStep("contas-bancarias");
   }
 
-  function finalizar() {
-    contas.forEach((c) =>
-      addConta({ nome: c.nome, banco: c.banco, tipo: "Corrente", saldoInicial: c.saldo, cor: c.cor })
-    );
-    cartoes.forEach((c) =>
-      addCartao({ nome: c.nome, banco: c.banco, bandeira: "Mastercard", limite: c.limite, diaVencimento: c.dia, cor: c.cor })
-    );
+  async function finalizar() {
+    setLoading(true);
+    for (const c of contas) {
+      await addConta({ nome: c.nome, banco: c.banco, tipo: "Corrente", saldoInicial: c.saldo, cor: c.cor });
+    }
+    for (const c of cartoes) {
+      await addCartao({ nome: c.nome, banco: c.banco, bandeira: "Mastercard", limite: c.limite, diaVencimento: c.dia, cor: c.cor });
+    }
+    setLoading(false);
     setStep("fim");
     setTimeout(() => location.reload(), 600);
   }
@@ -97,7 +102,9 @@ export default function SignupForm({ onSwitch, onBack }: { onSwitch: () => void;
               <input type="password" className="input" required value={senha} onChange={(e) => setSenha(e.target.value)} />
             </div>
             {err && <div className="text-xs text-danger bg-danger/10 border border-danger/20 rounded p-2">{err}</div>}
-            <button type="submit" className="btn btn-primary w-full">Continuar <ArrowRight size={14} /></button>
+            <button type="submit" className="btn btn-primary w-full" disabled={loading}>
+              {loading ? "Criando..." : <>Continuar <ArrowRight size={14} /></>}
+            </button>
           </form>
         </>
       )}
@@ -145,7 +152,9 @@ export default function SignupForm({ onSwitch, onBack }: { onSwitch: () => void;
           </div>
           <div className="flex gap-2 mt-6">
             <button className="btn btn-ghost flex-1" onClick={finalizar}>Pular</button>
-            <button className="btn btn-primary flex-1" onClick={finalizar}>Finalizar</button>
+            <button className="btn btn-primary flex-1" disabled={loading} onClick={finalizar}>
+              {loading ? "Salvando..." : "Finalizar"}
+            </button>
           </div>
         </>
       )}

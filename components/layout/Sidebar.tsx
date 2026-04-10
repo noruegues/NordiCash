@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 import {
-  LayoutDashboard, TrendingUp, Receipt, CreditCard, LineChart, Layers, Wallet, Landmark, X,
+  LayoutDashboard, TrendingUp, Receipt, CreditCard, LineChart, Layers, Wallet, Landmark, X, Shield,
 } from "lucide-react";
 import { useCurrentUser } from "@/lib/auth";
 
@@ -20,6 +20,7 @@ const items = [
 
 export default function Sidebar({ mobileOpen = false, onClose }: { mobileOpen?: boolean; onClose?: () => void }) {
   const path = usePathname();
+  const user = useCurrentUser();
   const grouped = items.reduce<Record<string, typeof items>>((acc, it) => {
     (acc[it.group] ||= []).push(it);
     return acc;
@@ -77,6 +78,24 @@ export default function Sidebar({ mobileOpen = false, onClose }: { mobileOpen?: 
             </div>
           </div>
         ))}
+        {user?.isAdmin && (
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-zinc-500 px-3 mb-2">Administração</div>
+            <div className="flex flex-col gap-0.5">
+              <Link
+                href="/admin"
+                className={`flex items-center gap-3 px-3 py-2 rounded text-sm transition-colors ${
+                  path === "/admin"
+                    ? "bg-primary/10 text-primary font-medium"
+                    : "text-zinc-400 hover:text-zinc-100 hover:bg-surface2"
+                }`}
+              >
+                <Shield size={17} />
+                Painel Admin
+              </Link>
+            </div>
+          </div>
+        )}
       </nav>
 
       <SidebarFooter />

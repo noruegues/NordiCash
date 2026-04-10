@@ -1,0 +1,210 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String   @id @default(uuid())
+  login       String   @unique
+  email       String?
+  nome        String
+  senhaHash   String   @map("senha_hash")
+  plano       String   @default("Free")
+  avatar      String?
+  welcomeSeen Boolean  @default(false) @map("welcome_seen")
+  theme       String   @default("dark")
+  isAdmin     Boolean  @default(false) @map("is_admin")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  contas        ContaBancaria[]
+  receitas      Receita[]
+  despesas      Despesa[]
+  cartoes       Cartao[]
+  investimentos Investimento[]
+  consorcios    Consorcio[]
+  bens          Bem[]
+  avisosLidos   AvisoLido[]
+
+  @@map("users")
+}
+
+model ContaBancaria {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  nome        String
+  banco       String
+  tipo        String   @default("Corrente")
+  saldoInicial Float   @default(0) @map("saldo_inicial")
+  cor         String   @default("#6366f1")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  receitas Receita[]
+  despesas Despesa[]
+
+  @@map("contas_bancarias")
+}
+
+model Receita {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  fonte       String
+  categoria   String
+  valor       Float
+  contaId     String?  @map("conta_id")
+  mesRef      String   @map("mes_ref")
+  recorrencia String   @default("Única")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user  User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conta ContaBancaria? @relation(fields: [contaId], references: [id], onDelete: SetNull)
+
+  @@map("receitas")
+}
+
+model Despesa {
+  id               String   @id @default(uuid())
+  userId           String   @map("user_id")
+  descricao        String
+  categoria        String
+  valor            Float
+  data             String
+  mesRef           String   @map("mes_ref")
+  forma            String   @default("Pix")
+  contaId          String?  @map("conta_id")
+  cartaoId         String?  @map("cartao_id")
+  recorrencia      String   @default("Única")
+  recorrenciaMeses Int?     @map("recorrencia_meses")
+  emprestado       Boolean  @default(false)
+  pago             Boolean  @default(false)
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  user   User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conta  ContaBancaria? @relation(fields: [contaId], references: [id], onDelete: SetNull)
+  cartao Cartao?        @relation(fields: [cartaoId], references: [id], onDelete: SetNull)
+
+  @@map("despesas")
+}
+
+model Cartao {
+  id             String   @id @default(uuid())
+  userId         String   @map("user_id")
+  nome           String
+  banco          String
+  bandeira       String   @default("Visa")
+  cor            String   @default("#6366f1")
+  limite         Float    @default(0)
+  diaVencimento  Int      @map("dia_vencimento")
+  faturaPagaMes  String?  @map("fatura_paga_mes")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  despesas Despesa[]
+
+  @@map("cartoes")
+}
+
+model Investimento {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  nome         String
+  tipo         String
+  valorInicial Float    @map("valor_inicial")
+  aporteMensal Float    @default(0) @map("aporte_mensal")
+  saldoAtual   Float    @map("saldo_atual")
+  inicio       String
+  taxaMensal   Float?   @map("taxa_mensal")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("investimentos")
+}
+
+model Consorcio {
+  id                 String   @id @default(uuid())
+  userId             String   @map("user_id")
+  bem                String
+  administradora     String
+  valorCarta         Float    @map("valor_carta")
+  prazoMeses         Int      @map("prazo_meses")
+  parcelaCheia       Float    @map("parcela_cheia")
+  taxaAdmin          Float    @map("taxa_admin")
+  inicio             String
+  diaVencimento      Int      @map("dia_vencimento")
+  debitoAutomatico   Boolean  @default(false) @map("debito_automatico")
+  contaId            String?  @map("conta_id")
+  contemplado        Boolean  @default(false)
+  pagamentoReduzido  Boolean  @default(false) @map("pagamento_reduzido")
+  percentualReducao  Float?   @map("percentual_reducao")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  user     User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parcelas ParcelaConsorcio[]
+
+  @@map("consorcios")
+}
+
+model ParcelaConsorcio {
+  id          String   @id @default(uuid())
+  consorcioId String   @map("consorcio_id")
+  numero      Int
+  mesRef      String   @map("mes_ref")
+  valor       Float
+  paga        Boolean  @default(false)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  consorcio Consorcio @relation(fields: [consorcioId], references: [id], onDelete: Cascade)
+
+  @@map("parcelas_consorcio")
+}
+
+model Bem {
+  id             String   @id @default(uuid())
+  userId         String   @map("user_id")
+  nome           String
+  tipo           String
+  valorCompra    Float    @map("valor_compra")
+  valorMercado   Float    @map("valor_mercado")
+  anosUso        Int      @default(0) @map("anos_uso")
+  dividaRestante Float    @default(0) @map("divida_restante")
+  taxaAnual      Float?   @map("taxa_anual")
+  comportamento  String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("bens")
+}
+
+model Aviso {
+  id        String   @id @default(uuid())
+  titulo    String
+  mensagem  String
+  tipo      String   @default("info") // info, success, warning, danger
+  planoAlvo String?  @map("plano_alvo") // null = todos, "Free", "Pro", "Premium"
+  ativo     Boolean  @default(true)
+  criadoEm  DateTime @default(now()) @map("criado_em")
+
+  lidos AvisoLido[]
+
+  @@map("avisos")
+}
+
+model AvisoLido {
+  id       String   @id @default(uuid())
+  avisoId  String   @map("aviso_id")
+  userId   String   @map("user_id")
+  lidoEm   DateTime @default(now()) @map("lido_em")
+
+  aviso Aviso @relation(fields: [avisoId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([avisoId, userId])
+  @@map("avisos_lidos")
+}

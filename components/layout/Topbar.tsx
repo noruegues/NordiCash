@@ -236,27 +236,16 @@ function PerfilPanel({ onBack }: { onBack: () => void }) {
 
 function SenhaPanel({ onBack }: { onBack: () => void }) {
   const user = useCurrentUser()!;
-  const { changeLogin, changePassword } = useAuth();
-  const [novoLogin, setNovoLogin] = useState(user.login);
+  const { changePassword } = useAuth();
   const [atual, setAtual] = useState("");
   const [nova, setNova] = useState("");
   const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
   return (
     <div className="card-body">
-      <PanelHeader title="Login & senha" onBack={onBack} />
+      <PanelHeader title="Alterar senha" onBack={onBack} />
       <div className="space-y-3">
         <div>
-          <label className="label">Login (usuário)</label>
-          <div className="flex gap-2">
-            <input className="input" value={novoLogin} onChange={(e) => setNovoLogin(e.target.value)} />
-            <button className="btn btn-soft btn-sm" onClick={() => {
-              const r = changeLogin(novoLogin);
-              setMsg(r.ok ? { type: "ok", text: "Login atualizado" } : { type: "err", text: r.error! });
-            }}>OK</button>
-          </div>
-        </div>
-        <div className="border-t border-border pt-3">
           <label className="label">Senha atual</label>
           <input type="password" className="input" value={atual} onChange={(e) => setAtual(e.target.value)} />
         </div>
@@ -264,8 +253,8 @@ function SenhaPanel({ onBack }: { onBack: () => void }) {
           <label className="label">Nova senha</label>
           <input type="password" className="input" value={nova} onChange={(e) => setNova(e.target.value)} />
         </div>
-        <button className="btn btn-primary w-full" onClick={() => {
-          const r = changePassword(atual, nova);
+        <button className="btn btn-primary w-full" onClick={async () => {
+          const r = await changePassword(atual, nova);
           if (r.ok) { setMsg({ type: "ok", text: "Senha alterada" }); setAtual(""); setNova(""); }
           else setMsg({ type: "err", text: r.error! });
         }}>Alterar senha</button>
