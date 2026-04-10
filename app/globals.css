@@ -1,0 +1,122 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
+
+html, body { background: #0B0D10; color: #E5E7EB; }
+body { font-family: 'DM Sans', Inter, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+
+/* Chart theming variables */
+:root {
+  --chart-grid: #23272F;
+  --chart-axis: #8A93A2;
+  --chart-tooltip-bg: #13161B;
+  --chart-tooltip-border: #23272F;
+  --chart-tooltip-text: #E5E7EB;
+}
+html.light {
+  --chart-grid: #E2E8F0;
+  --chart-axis: #475569;
+  --chart-tooltip-bg: #FFFFFF;
+  --chart-tooltip-border: #CBD5E1;
+  --chart-tooltip-text: #0F172A;
+}
+
+/* ===== LIGHT THEME OVERRIDES ===== */
+html.light, html.light body { background: #F8FAFC; color: #0F172A; }
+html.light .bg-bg { background-color: #F8FAFC !important; }
+html.light .bg-surface { background-color: #FFFFFF !important; }
+html.light .bg-surface\/60, html.light .bg-surface\/80 { background-color: rgba(255,255,255,0.85) !important; }
+html.light .bg-surface2 { background-color: #F1F5F9 !important; }
+html.light .bg-surface2\/40 { background-color: rgba(241,245,249,0.5) !important; }
+html.light .bg-surface2\/50 { background-color: rgba(241,245,249,0.7) !important; }
+html.light .border-border { border-color: #E2E8F0 !important; }
+html.light .border-border\/60 { border-color: rgba(226,232,240,0.7) !important; }
+html.light .divide-border > * + * { border-color: #E2E8F0 !important; }
+html.light .text-zinc-100 { color: #0F172A !important; }
+html.light .text-zinc-200 { color: #1E293B !important; }
+html.light .text-zinc-300 { color: #334155 !important; }
+html.light .text-zinc-400 { color: #475569 !important; }
+html.light .text-zinc-500 { color: #64748B !important; }
+html.light .input, html.light .select, html.light .textarea { background-color: #F8FAFC !important; color: #0F172A !important; border-color: #E2E8F0 !important; }
+html.light .card { box-shadow: 0 1px 3px rgba(15,23,42,0.06), 0 1px 2px rgba(15,23,42,0.04); }
+html.light ::-webkit-scrollbar-thumb { background: #CBD5E1; }
+
+/* Card */
+.card {
+  @apply relative bg-surface border border-border rounded-md shadow-soft;
+}
+.card-header {
+  @apply flex justify-between items-center gap-3 min-h-14 px-5 border-b border-border;
+}
+.card-body {
+  @apply p-5;
+}
+.card-title {
+  @apply text-base font-semibold text-zinc-100;
+}
+
+/* Buttons */
+.btn {
+  @apply inline-flex items-center justify-center gap-1.5 px-3.5 h-9 rounded text-sm font-medium transition-colors whitespace-nowrap leading-none;
+}
+.btn-primary { @apply bg-primary text-white hover:bg-primary/90; }
+.btn-success { @apply bg-success text-white hover:bg-success/90; }
+.btn-danger  { @apply bg-danger text-white hover:bg-danger/90; }
+.btn-ghost   { @apply border border-border text-zinc-300 hover:bg-surface2; }
+.btn-soft    { @apply bg-primary/10 text-primary hover:bg-primary/20; }
+.btn-sm      { @apply h-7 px-2.5 text-xs; }
+.btn-icon    { @apply w-9 px-0; }
+
+/* Form */
+.label {
+  @apply block text-xs font-medium text-zinc-400 mb-1.5;
+}
+.input, .select, .textarea {
+  @apply w-full bg-surface2 border border-border rounded px-3 h-9 text-sm text-zinc-100 outline-none transition;
+  @apply focus:border-primary/60 focus:ring-2 focus:ring-primary/20;
+  @apply disabled:opacity-60 disabled:cursor-not-allowed;
+}
+.textarea { @apply h-auto py-2; }
+.select {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238A93A2' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  appearance: none;
+  padding-right: 2rem;
+}
+
+/* Tables */
+table.t { @apply w-full text-sm border-collapse; }
+table.t th { @apply text-left text-zinc-500 font-medium py-3 px-4 border-b border-border text-xs uppercase tracking-wider; }
+table.t td { @apply py-3 px-4 border-b border-border/60 text-zinc-200; }
+table.t th.text-right, table.t td.text-right { text-align: right; }
+table.t tr:hover td { @apply bg-surface2/50; }
+
+/* Pills */
+.pill {
+  @apply inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border;
+}
+.pill-success { @apply bg-success/10 text-success border-success/20; }
+.pill-danger  { @apply bg-danger/10 text-danger border-danger/20; }
+.pill-warn    { @apply bg-warn/10 text-warn border-warn/20; }
+.pill-info    { @apply bg-primary/10 text-primary border-primary/20; }
+.pill-muted   { @apply bg-surface2 text-zinc-400 border-border; }
+
+/* Modal */
+.modal-backdrop {
+  @apply fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4;
+  animation: fadeIn .15s ease-out;
+}
+.modal-panel {
+  @apply card w-full max-w-lg max-h-[90vh] overflow-y-auto;
+  animation: slideUp .2s ease-out;
+}
+@keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: none } }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: #23272F; border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: #2D323B; }
