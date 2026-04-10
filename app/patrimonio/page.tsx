@@ -178,7 +178,7 @@ export default function PatrimonioPage() {
       />
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <KpiCard label="Patrimônio atual" value={brl(patrimonioAtual)} delta={4.2} icon={<Wallet size={18} />} accent />
+        <KpiCard label="Patrimônio atual" value={brl(patrimonioAtual)} icon={<Wallet size={18} />} accent />
         <KpiCard label="Contas" value={brl(saldoContas)} icon={<Landmark size={18} />} />
         <KpiCard label="Investimentos" value={brl(totalInv)} icon={<Wallet size={18} />} />
         <KpiCard label="Bens líquidos" value={brl(totalBens - totalDividas)} icon={<Wallet size={18} />} />

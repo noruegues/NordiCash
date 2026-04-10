@@ -75,7 +75,7 @@ export default function InvestimentosPage() {
       />
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <KpiCard label="Saldo total" value={brl(total)} delta={3.7} icon={<LineChart size={18} />} accent />
+        <KpiCard label="Saldo total" value={brl(total)} icon={<LineChart size={18} />} accent />
         <KpiCard label="Rendimento" value={brl(rendimento)} icon={<LineChart size={18} />} />
         <KpiCard label="Aporte mensal" value={brl(aporteMensal)} icon={<LineChart size={18} />} />
         <KpiCard label="Ativos" value={String(investimentos.length)} icon={<LineChart size={18} />} />

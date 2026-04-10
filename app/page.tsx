@@ -59,6 +59,31 @@ export default function Dashboard() {
   const saldo = totalReceita - totalDespesa;
   const totalInv = investimentos.reduce((s, i) => s + i.saldoAtual, 0);
 
+  // Calcular deltas reais: mês atual vs mês anterior
+  const mesAnterior = useMemo(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - 1);
+    return d.toISOString().slice(0, 7);
+  }, []);
+
+  const recMesAtual = receitas.filter((r) => r.mesRef === mesAtual).reduce((s, r) => s + r.valor, 0);
+  const recMesAnterior = receitas.filter((r) => r.mesRef === mesAnterior).reduce((s, r) => s + r.valor, 0);
+  const desMesAtual = despesas.filter((d) => d.mesRef === mesAtual).reduce((s, d) => s + d.valor, 0);
+  const desMesAnterior = despesas.filter((d) => d.mesRef === mesAnterior).reduce((s, d) => s + d.valor, 0);
+  const saldoMesAtual = recMesAtual - desMesAtual;
+  const saldoMesAnterior = recMesAnterior - desMesAnterior;
+
+  function calcDelta(atual: number, anterior: number): number | undefined {
+    if (anterior === 0 && atual === 0) return undefined;
+    if (anterior === 0) return atual > 0 ? 100 : -100;
+    return ((atual - anterior) / Math.abs(anterior)) * 100;
+  }
+
+  const deltaReceita = calcDelta(recMesAtual, recMesAnterior);
+  const deltaDespesa = calcDelta(desMesAtual, desMesAnterior);
+  const deltaSaldo = calcDelta(saldoMesAtual, saldoMesAnterior);
+  const deltaInv = undefined; // investimentos não têm comparação mensal simples
+
   const porCategoria = Object.entries(
     desF.reduce<Record<string, number>>((acc, d) => {
       acc[d.categoria] = (acc[d.categoria] || 0) + d.valor;
@@ -127,10 +152,10 @@ export default function Dashboard() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard label="Receitas" value={brl(totalReceita)} delta={5.2} icon={<TrendingUp size={18} />} accent />
-        <KpiCard label="Despesas" value={brl(totalDespesa)} delta={-2.1} icon={<TrendingDown size={18} />} />
-        <KpiCard label="Saldo" value={brl(saldo)} delta={8.4} icon={<Wallet size={18} />} />
-        <KpiCard label="Investimentos" value={brl(totalInv)} delta={3.7} icon={<LineChart size={18} />} />
+        <KpiCard label="Receitas" value={brl(totalReceita)} delta={deltaReceita} icon={<TrendingUp size={18} />} accent />
+        <KpiCard label="Despesas" value={brl(totalDespesa)} delta={deltaDespesa} icon={<TrendingDown size={18} />} />
+        <KpiCard label="Saldo" value={brl(saldo)} delta={deltaSaldo} icon={<Wallet size={18} />} />
+        <KpiCard label="Investimentos" value={brl(totalInv)} delta={deltaInv} icon={<LineChart size={18} />} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
