@@ -9,6 +9,9 @@ export async function GET() {
   const user = await prisma.user.findUnique({ where: { id: session.userId } })
   if (!user) return NextResponse.json({ user: null }, { status: 401 })
 
+  // Atualiza lastSeenAt
+  prisma.user.update({ where: { id: session.userId }, data: { lastSeenAt: new Date() } }).catch(() => {})
+
   return NextResponse.json({
     user: { id: user.id, login: user.login, nome: user.nome, email: user.email, plano: user.plano, avatar: user.avatar, isAdmin: user.isAdmin, isSuporte: user.isSuporte, theme: user.theme, welcomeSeen: user.welcomeSeen, createdAt: user.createdAt },
   })

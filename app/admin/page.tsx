@@ -86,6 +86,12 @@ export default function AdminPage() {
     if (res.ok) setUsers((prev) => prev.filter((u) => u.id !== userId));
   }
 
+  const authLoading = useAuth((s) => s.loading);
+
+  if (loading || authLoading) {
+    return <div className="min-h-screen bg-bg flex items-center justify-center"><div className="text-zinc-400">Carregando...</div></div>;
+  }
+
   if (!currentUser?.isAdmin && !currentUser?.isSuporte) {
     return (
       <div className="min-h-screen bg-bg flex items-center justify-center">
@@ -96,10 +102,6 @@ export default function AdminPage() {
         </div>
       </div>
     );
-  }
-
-  if (loading) {
-    return <div className="min-h-screen bg-bg flex items-center justify-center"><div className="text-zinc-400">Carregando...</div></div>;
   }
 
   if (error) {
