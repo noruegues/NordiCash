@@ -40,6 +40,7 @@ type Aviso = {
 
 export default function AdminPage() {
   const currentUser = useAuth((s) => s.user);
+  const authLoading = useAuth((s) => s.loading);
   const [tab, setTab] = useState<"users" | "avisos">("users");
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [avisos, setAvisos] = useState<Aviso[]>([]);
@@ -85,8 +86,6 @@ export default function AdminPage() {
     });
     if (res.ok) setUsers((prev) => prev.filter((u) => u.id !== userId));
   }
-
-  const authLoading = useAuth((s) => s.loading);
 
   if (loading || authLoading) {
     return <div className="min-h-screen bg-bg flex items-center justify-center"><div className="text-zinc-400">Carregando...</div></div>;
