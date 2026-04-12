@@ -210,8 +210,8 @@ export const useStore = create<State>()((set, get) => ({
     set((s) => ({ contas: [conta, ...s.contas] }));
   },
   updateConta: async (id, c) => {
-    await api("/api/contas", "PATCH", { id, ...c });
     set((s) => ({ contas: s.contas.map((x) => (x.id === id ? { ...x, ...c } : x)) }));
+    api("/api/contas", "PATCH", { id, ...c }).catch(() => get().loadAll());
   },
   removeConta: async (id) => {
     await api("/api/contas", "DELETE", { id });
@@ -224,8 +224,8 @@ export const useStore = create<State>()((set, get) => ({
     set((s) => ({ receitas: [receita, ...s.receitas] }));
   },
   updateReceita: async (id, r) => {
-    await api("/api/receitas", "PATCH", { id, ...r });
     set((s) => ({ receitas: s.receitas.map((x) => (x.id === id ? { ...x, ...r } : x)) }));
+    api("/api/receitas", "PATCH", { id, ...r }).catch(() => get().loadAll());
   },
   removeReceita: async (id) => {
     await api("/api/receitas", "DELETE", { id });
@@ -238,8 +238,11 @@ export const useStore = create<State>()((set, get) => ({
     set((s) => ({ despesas: [despesa, ...s.despesas] }));
   },
   updateDespesa: async (id, d) => {
-    await api("/api/despesas", "PATCH", { id, ...d });
     set((s) => ({ despesas: s.despesas.map((x) => (x.id === id ? { ...x, ...d } : x)) }));
+    api("/api/despesas", "PATCH", { id, ...d }).catch(() => {
+      // Reverte em caso de erro
+      get().loadAll();
+    });
   },
   removeDespesa: async (id) => {
     await api("/api/despesas", "DELETE", { id });
@@ -256,8 +259,8 @@ export const useStore = create<State>()((set, get) => ({
     set((s) => ({ cartoes: [cartao, ...s.cartoes] }));
   },
   updateCartao: async (id, c) => {
-    await api("/api/cartoes", "PATCH", { id, ...c });
     set((s) => ({ cartoes: s.cartoes.map((x) => (x.id === id ? { ...x, ...c } : x)) }));
+    api("/api/cartoes", "PATCH", { id, ...c }).catch(() => get().loadAll());
   },
   removeCartao: async (id) => {
     await api("/api/cartoes", "DELETE", { id });
@@ -309,8 +312,8 @@ export const useStore = create<State>()((set, get) => ({
     set((s) => ({ investimentos: [inv, ...s.investimentos] }));
   },
   updateInvestimento: async (id, i) => {
-    await api("/api/investimentos", "PATCH", { id, ...i });
     set((s) => ({ investimentos: s.investimentos.map((x) => (x.id === id ? { ...x, ...i } : x)) }));
+    api("/api/investimentos", "PATCH", { id, ...i }).catch(() => get().loadAll());
   },
   removeInvestimento: async (id) => {
     await api("/api/investimentos", "DELETE", { id });
@@ -323,8 +326,8 @@ export const useStore = create<State>()((set, get) => ({
     set((s) => ({ consorcios: [consorcio, ...s.consorcios] }));
   },
   updateConsorcio: async (id, c) => {
-    await api("/api/consorcios", "PATCH", { id, ...c });
     set((s) => ({ consorcios: s.consorcios.map((x) => (x.id === id ? { ...x, ...c } : x)) }));
+    api("/api/consorcios", "PATCH", { id, ...c }).catch(() => get().loadAll());
   },
   removeConsorcio: async (id) => {
     await api("/api/consorcios", "DELETE", { id });
@@ -445,8 +448,8 @@ export const useStore = create<State>()((set, get) => ({
     set((s) => ({ bens: [bem, ...s.bens] }));
   },
   updateBem: async (id, b) => {
-    await api("/api/bens", "PATCH", { id, ...b });
     set((s) => ({ bens: s.bens.map((x) => (x.id === id ? { ...x, ...b } : x)) }));
+    api("/api/bens", "PATCH", { id, ...b }).catch(() => get().loadAll());
   },
   removeBem: async (id) => {
     await api("/api/bens", "DELETE", { id });
