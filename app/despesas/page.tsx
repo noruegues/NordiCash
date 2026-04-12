@@ -5,7 +5,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import Modal from "@/components/ui/Modal";
 import { useStore, type Despesa, type ContaBancaria, type Cartao, type FormaPagamento, type RecorrenciaTipo } from "@/lib/store";
 import { brl, mesRefBR } from "@/lib/format";
-import { Plus, Pencil, Trash2, Check, CheckCheck, AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Pencil, Trash2, Check, CheckCheck, AlertTriangle, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import MacroView from "@/components/MacroView";
 import MoneyInput from "@/components/ui/MoneyInput";
 import MonthFilter, { applyMonthFilter, type MonthFilterValue } from "@/components/ui/MonthFilter";
@@ -31,6 +31,18 @@ export default function DespesasPage() {
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Despesa | null>(null);
   const [dupAlert, setDupAlert] = useState<{ items: Omit<Despesa, "id">[]; existing: string } | null>(null);
+  const [sortCol, setSortCol] = useState<string>("recent");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+
+  function toggleSort(col: string) {
+    if (sortCol === col) setSortDir((d) => d === "asc" ? "desc" : "asc");
+    else { setSortCol(col); setSortDir(col === "valor" ? "desc" : "asc"); }
+  }
+
+  function SortIcon({ col }: { col: string }) {
+    if (sortCol !== col) return <ArrowUpDown size={12} className="text-zinc-600" />;
+    return sortDir === "asc" ? <ArrowUp size={12} /> : <ArrowDown size={12} />;
+  }
 
   const despesas = applyMonthFilter(allDespesas, monthFilter);
   const total = despesas.reduce((s, d) => s + d.valor, 0);
@@ -201,13 +213,66 @@ export default function DespesasPage() {
         >
           {filtered.length === 0 ? (
             <div className="text-sm text-zinc-500 py-6 text-center">Nenhuma despesa</div>
-          ) : (
+          ) : (() => {
+            // Função de comparação para a coluna selecionada
+            function cmpVal(a: Despesa, b: Despesa): number {
+              const dir = sortDir === "asc" ? 1 : -1;
+              if (sortCol === "descricao") return dir * a.descricao.localeCompare(b.descricao);
+              if (sortCol === "categoria") return dir * a.categoria.localeCompare(b.categoria);
+              if (sortCol === "forma") return dir * a.forma.localeCompare(b.forma);
+              if (sortCol === "mesRef") return dir * a.mesRef.localeCompare(b.mesRef);
+              if (sortCol === "valor") return dir * (a.valor - b.valor);
+              // default "recent": por posição original (mais recente primeiro)
+              return 0;
+            }
+
+            // Agrupa itens: parcelas com groupId ficam juntas
+            const groups: Despesa[][] = [];
+            const groupMap = new Map<string, number>();
+            for (const d of filtered) {
+              const gk = d.groupId;
+              if (gk && groupMap.has(gk)) {
+                groups[groupMap.get(gk)!].push(d);
+              } else {
+                if (gk) groupMap.set(gk, groups.length);
+                groups.push([d]);
+              }
+            }
+
+            // Ordena parcelas dentro de cada grupo por mesRef
+            for (const g of groups) {
+              if (g.length > 1) g.sort((a, b) => a.mesRef.localeCompare(b.mesRef));
+            }
+
+            // Ordena os grupos pelo primeiro item de cada grupo usando a coluna selecionada
+            groups.sort((a, b) => cmpVal(a[0], b[0]));
+
+            // Flatten e mapeia índice de grupo para cor alternada
+            const sorted: (Despesa & { _groupIdx: number })[] = [];
+            for (let gi = 0; gi < groups.length; gi++) {
+              for (const d of groups[gi]) {
+                sorted.push({ ...d, _groupIdx: gi });
+              }
+            }
+            return (
             <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
             <table className="t min-w-[720px]">
-              <thead><tr><th className="w-10">Pago</th><th>Descrição</th><th>Categoria</th><th>Forma</th><th>Origem</th><th>Mês</th><th className="text-right">Valor</th><th></th></tr></thead>
+              <thead><tr>
+                <th className="w-10">Pago</th>
+                <th className="cursor-pointer select-none" onClick={() => toggleSort("descricao")}><span className="inline-flex items-center gap-1">Descrição <SortIcon col="descricao" /></span></th>
+                <th className="cursor-pointer select-none" onClick={() => toggleSort("categoria")}><span className="inline-flex items-center gap-1">Categoria <SortIcon col="categoria" /></span></th>
+                <th className="cursor-pointer select-none" onClick={() => toggleSort("forma")}><span className="inline-flex items-center gap-1">Forma <SortIcon col="forma" /></span></th>
+                <th>Origem</th>
+                <th className="cursor-pointer select-none" onClick={() => toggleSort("mesRef")}><span className="inline-flex items-center gap-1">Mês <SortIcon col="mesRef" /></span></th>
+                <th className="text-right cursor-pointer select-none" onClick={() => toggleSort("valor")}><span className="inline-flex items-center gap-1 justify-end">Valor <SortIcon col="valor" /></span></th>
+                <th></th>
+              </tr></thead>
               <tbody>
-                {filtered.map((d) => (
-                  <tr key={d.id} className={`${d.emprestado ? "bg-loan/5" : ""} ${d.pago ? "opacity-60" : ""}`}>
+                {sorted.map((d) => {
+                  const isAlt = d.groupId && d._groupIdx % 2 === 1;
+                  return (
+                  <tr key={d.id} className={`${d.emprestado ? "bg-loan/5" : ""} ${d.pago ? "opacity-60" : ""}`} style={isAlt ? { backgroundColor: "var(--color-surface-alt)" } : undefined}>
+
                     <td>
                       <button
                         className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${
@@ -234,11 +299,13 @@ export default function DespesasPage() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
             </div>
-          )}
+            );
+          })()}
         </Card>
 
         <Card title="Por categoria">

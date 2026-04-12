@@ -15,6 +15,7 @@ body { font-family: 'DM Sans', Inter, system-ui, sans-serif; -webkit-font-smooth
   --chart-tooltip-border: #23272F;
   --chart-tooltip-text: #E5E7EB;
   --color-surface: #13161B;
+  --color-surface-alt: rgba(255,255,255,0.04);
 }
 html.light {
   --chart-grid: #E2E8F0;
@@ -23,6 +24,7 @@ html.light {
   --chart-tooltip-border: #CBD5E1;
   --chart-tooltip-text: #0F172A;
   --color-surface: #FFFFFF;
+  --color-surface-alt: rgba(241,245,249,0.7);
 }
 
 /* ===== LIGHT THEME OVERRIDES ===== */
