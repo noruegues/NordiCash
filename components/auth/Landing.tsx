@@ -113,10 +113,10 @@ export default function Landing() {
                     <div className="w-3 h-3 rounded-full bg-green-300" />
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                    <GlassKpi label="Receitas" value="R$ 7.000" accent="emerald" />
-                    <GlassKpi label="Despesas" value="R$ 5.198" accent="red" />
-                    <GlassKpi label="Saldo" value="R$ 1.802" accent="blue" />
-                    <GlassKpi label="Investido" value="R$ 5.981" accent="purple" />
+                    <GlassKpi label="Receitas" value="R$ 8.500,00" accent="emerald" />
+                    <GlassKpi label="Despesas" value="R$ 5.800,00" accent="red" />
+                    <GlassKpi label="Saldo" value="R$ 2.700,00" accent="blue" />
+                    <GlassKpi label="Investido" value="R$ 62.530,00" accent="purple" />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div className="md:col-span-2 rounded-xl border border-slate-100 bg-white p-4">
