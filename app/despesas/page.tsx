@@ -591,7 +591,7 @@ function DeleteDespesaDialog({
             {hasGroup ? (
               <>
                 <p className="font-medium text-zinc-100 mb-1">&quot;{despesa.descricao}&quot;</p>
-                <p>Esta despesa faz parte de uma recorrência com <span className="font-semibold text-zinc-100">{groupCount} parcelas</span>. O que deseja fazer?</p>
+                <p>Esta despesa faz parte de um grupo com <span className="font-semibold text-zinc-100">{groupCount} parcelas restantes</span>. O que deseja fazer?</p>
               </>
             ) : (
               <p>Tem certeza que deseja apagar <span className="font-semibold text-zinc-100">&quot;{despesa.descricao}&quot;</span>?</p>
@@ -606,7 +606,7 @@ function DeleteDespesaDialog({
                 className="btn btn-danger w-full justify-center"
                 onClick={onDeleteGroup}
               >
-                <Trash2 size={14} /> Apagar todas as {groupCount} parcelas
+                <Trash2 size={14} /> Apagar as {groupCount} parcelas restantes
               </button>
               <button
                 className="btn btn-soft w-full justify-center"
