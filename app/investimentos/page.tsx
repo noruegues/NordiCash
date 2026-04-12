@@ -7,6 +7,7 @@ import Modal from "@/components/ui/Modal";
 import LineProjecao from "@/components/charts/LineProjecao";
 import PieCategoria from "@/components/charts/PieCategoria";
 import { useStore, type Investimento } from "@/lib/store";
+import MoneyInput from "@/components/ui/MoneyInput";
 import { projecaoInvestimento, projecaoPortfolio } from "@/lib/calculations";
 import { brl, dataBR } from "@/lib/format";
 import { LineChart, Plus, Pencil, Trash2, RefreshCw, Info } from "lucide-react";
@@ -263,16 +264,16 @@ function InvModal({
             <input type="date" className="input" required value={f.inicio} onChange={(e) => setF({ ...f, inicio: e.target.value })} />
           </div>
           <div>
-            <label className="label">Valor inicial (R$)</label>
-            <input type="number" step="0.01" className="input" value={f.valorInicial || ""} onChange={(e) => setF({ ...f, valorInicial: parseFloat(e.target.value) || 0 })} />
+            <label className="label">Valor inicial</label>
+            <MoneyInput value={f.valorInicial} onChange={(v) => setF({ ...f, valorInicial: v })} />
           </div>
           <div>
-            <label className="label">Aporte mensal (R$)</label>
-            <input type="number" step="0.01" className="input" value={f.aporteMensal || ""} onChange={(e) => setF({ ...f, aporteMensal: parseFloat(e.target.value) || 0 })} />
+            <label className="label">Aporte mensal</label>
+            <MoneyInput value={f.aporteMensal} onChange={(v) => setF({ ...f, aporteMensal: v })} />
           </div>
           <div>
-            <label className="label">Saldo atual (R$)</label>
-            <input type="number" step="0.01" className="input" required value={f.saldoAtual || ""} onChange={(e) => setF({ ...f, saldoAtual: parseFloat(e.target.value) || 0 })} />
+            <label className="label">Saldo atual</label>
+            <MoneyInput required value={f.saldoAtual} onChange={(v) => setF({ ...f, saldoAtual: v })} />
           </div>
           <div>
             <label className="label">Taxa esperada (% mês)</label>

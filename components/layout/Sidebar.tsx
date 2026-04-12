@@ -78,7 +78,7 @@ export default function Sidebar({ mobileOpen = false, onClose }: { mobileOpen?: 
             </div>
           </div>
         ))}
-        {user?.isAdmin && (
+        {(user?.isAdmin || user?.isSuporte) && (
           <div>
             <div className="text-[10px] uppercase tracking-wider text-zinc-500 px-3 mb-2">Administração</div>
             <div className="flex flex-col gap-0.5">
@@ -119,7 +119,7 @@ function SidebarFooter() {
           </div>
         </div>
       </div>
-      <div className="text-center text-[10px] text-zinc-600">NordiCash v1.0.0</div>
+      <div className="text-center text-[10px] text-zinc-600">NordiCash v1.2.0</div>
     </div>
   );
 }

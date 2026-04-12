@@ -152,33 +152,24 @@ export default function ConsorciosPage() {
 
 function ValorPagoCell({ value, onSave }: { value: number; onSave: (v: number) => void }) {
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(value.toFixed(2));
+  const [draft, setDraft] = useState(value);
 
   function commit() {
-    const v = parseFloat(draft.replace(",", "."));
-    if (!isNaN(v) && v >= 0) onSave(v);
+    if (draft >= 0) onSave(draft);
     setEditing(false);
   }
   function cancel() {
-    setDraft(value.toFixed(2));
+    setDraft(value);
     setEditing(false);
   }
 
   if (editing) {
     return (
       <div className="inline-flex items-center gap-1">
-        <input
-          type="number"
-          step="0.01"
-          autoFocus
-          className="input !h-7 !text-xs !py-1 !px-2 w-24 text-right"
+        <MoneyInput
           value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") commit();
-            if (e.key === "Escape") cancel();
-          }}
-          onBlur={commit}
+          onChange={(v) => setDraft(v)}
+          className="w-28 [&_input]:!h-7 [&_input]:!text-xs [&_input]:!py-1"
         />
         <button
           type="button"
@@ -206,7 +197,7 @@ function ValorPagoCell({ value, onSave }: { value: number; onSave: (v: number) =
         type="button"
         className="btn btn-ghost btn-sm btn-icon !h-6 !w-6 opacity-0 group-hover:opacity-100 transition"
         title="Editar valor"
-        onClick={() => { setDraft(value.toFixed(2)); setEditing(true); }}
+        onClick={() => { setDraft(value); setEditing(true); }}
       >
         <Pencil size={11} />
       </button>

@@ -16,7 +16,13 @@ export async function GET() {
 
   const avisos = await prisma.aviso.findMany({
     orderBy: { criadoEm: 'desc' },
-    include: { _count: { select: { lidos: true } } },
+    include: {
+      _count: { select: { lidos: true } },
+      lidos: {
+        select: { lidoEm: true, user: { select: { id: true, nome: true, login: true, avatar: true } } },
+        orderBy: { lidoEm: 'desc' },
+      },
+    },
   })
 
   return NextResponse.json(avisos)

@@ -2,9 +2,17 @@
 import { useMemo, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { brl, mesRefBR } from "@/lib/format";
-import { ArrowDown, ArrowUp, Minus } from "lucide-react";
+import { ArrowDown, ArrowUp, Minus, TrendingDown, TrendingUp } from "lucide-react";
+import { Line, LineChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell } from "recharts";
 
-type Item = { id: string; descricao?: string; fonte?: string; categoria: string; valor: number; mesRef: string };
+const MESES_NOME = ["JAN","FEV","MAR","ABR","MAI","JUN","JUL","AGO","SET","OUT","NOV","DEZ"];
+function mesLongo(ref: string): string {
+  if (!ref) return "";
+  const [y, m] = ref.split("-");
+  return `${MESES_NOME[parseInt(m, 10) - 1]} ${y}`;
+}
+
+type Item = { id: string; descricao?: string; fonte?: string; categoria: string; valor: number; mesRef: string; groupId?: string };
 
 export default function MacroView({
   items,
@@ -31,20 +39,58 @@ export default function MacroView({
   // Coletar todos os meses únicos ordenados
   const meses = useMemo(() => Array.from(new Set(filtered.map((i) => i.mesRef))).sort(), [filtered]);
 
-  // Normaliza nome removendo sufixo de parcela "(1/12)" etc para agrupar
-  function normalizeKey(raw: string): string {
-    if (groupMode !== "descricao") return raw;
+  // Normaliza nome removendo sufixo de parcela "(1/12)" etc
+  function stripSuffix(raw: string): string {
     return raw.replace(/\s*\(\d+\/\d+\)\s*$/, "").trim() || raw;
   }
 
   // Agrupar valores: { [grupo]: { [mes]: total } }
+  // Usa groupId para distinguir compras diferentes com mesmo nome
   const pivot = useMemo(() => {
     const map: Record<string, Record<string, number>> = {};
-    for (const i of filtered) {
-      const key = normalizeKey(String(i[groupMode] ?? "—"));
-      (map[key] ||= {});
-      map[key][i.mesRef] = (map[key][i.mesRef] || 0) + i.valor;
+
+    if (groupMode === "descricao") {
+      // Agrupa por groupId quando disponível, senão por nome normalizado
+      // Mapeia groupId → label para exibição
+      const groupLabels: Record<string, string> = {};
+      const nameCount: Record<string, number> = {};
+
+      // Primeira passagem: conta quantos grupos distintos por nome base
+      const groupsByName: Record<string, Set<string>> = {};
+      for (const i of filtered) {
+        const label = stripSuffix(String(i.descricao ?? "—"));
+        const gKey = i.groupId || i.id;
+        (groupsByName[label] ||= new Set()).add(gKey);
+      }
+
+      // Segunda passagem: agrupa com label diferenciado quando há múltiplos grupos
+      for (const i of filtered) {
+        const label = stripSuffix(String(i.descricao ?? "—"));
+        const gKey = i.groupId || i.id;
+
+        if (!groupLabels[gKey]) {
+          const groups = groupsByName[label];
+          if (groups && groups.size > 1) {
+            // Múltiplos grupos com mesmo nome — numera
+            nameCount[label] = (nameCount[label] || 0) + 1;
+            groupLabels[gKey] = `${label} (#${nameCount[label]})`;
+          } else {
+            groupLabels[gKey] = label;
+          }
+        }
+
+        const key = groupLabels[gKey];
+        (map[key] ||= {});
+        map[key][i.mesRef] = (map[key][i.mesRef] || 0) + i.valor;
+      }
+    } else {
+      for (const i of filtered) {
+        const key = String(i[groupMode] ?? "—");
+        (map[key] ||= {});
+        map[key][i.mesRef] = (map[key][i.mesRef] || 0) + i.valor;
+      }
     }
+
     return map;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtered, groupMode]);
@@ -57,11 +103,68 @@ export default function MacroView({
   const totalGeral = filtered.reduce((s, i) => s + i.valor, 0);
   const mediaMensal = meses.length > 0 ? totalGeral / meses.length : 0;
 
-  // Calcular variação total entre primeiro e último mês
-  const variacao =
-    meses.length >= 2 && totaisMes[meses[0]] > 0
-      ? ((totaisMes[meses[meses.length - 1]] - totaisMes[meses[0]]) / totaisMes[meses[0]]) * 100
-      : 0;
+  // Período anterior equivalente (mesma duração, meses imediatamente antes)
+  function shiftMes(mes: string, offset: number): string {
+    const [y, m] = mes.split("-").map(Number);
+    const d = new Date(y, m - 1 + offset, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  }
+
+  const { varPeriodoAnt, varAnoAnt, labelPeriodoAnt, labelAnoAnt, totalPeriodoAnt, totalAnoAnt, varMesAMes, mesUltimo, mesPenultimo } = useMemo(() => {
+    if (meses.length === 0) return { varPeriodoAnt: 0, varAnoAnt: 0, labelPeriodoAnt: "", labelAnoAnt: "", totalPeriodoAnt: 0, totalAnoAnt: 0, varMesAMes: 0, mesUltimo: "", mesPenultimo: "" };
+
+    const n = meses.length;
+    const primeiro = meses[0];
+    const ultimo = meses[meses.length - 1];
+
+    // Período anterior: N meses antes do primeiro mês
+    const antInicio = shiftMes(primeiro, -n);
+    const antFim = shiftMes(primeiro, -1);
+    const totalAnt = items
+      .filter((i) => i.mesRef >= antInicio && i.mesRef <= antFim)
+      .reduce((s, i) => s + i.valor, 0);
+
+    // Mesmo período do ano anterior
+    const anoAntInicio = shiftMes(primeiro, -12);
+    const anoAntFim = shiftMes(ultimo, -12);
+    const totalAno = items
+      .filter((i) => i.mesRef >= anoAntInicio && i.mesRef <= anoAntFim)
+      .reduce((s, i) => s + i.valor, 0);
+
+    const calcVar = (atual: number, anterior: number) => {
+      if (anterior === 0 && atual === 0) return 0;
+      if (anterior === 0) return 100;
+      return ((atual - anterior) / anterior) * 100;
+    };
+
+    // Variação mês a mês (último vs penúltimo)
+    let varMesAMes = 0;
+    let mesUltimo = "";
+    let mesPenultimo = "";
+    if (n >= 2) {
+      mesUltimo = meses[n - 1];
+      mesPenultimo = meses[n - 2];
+      const tUlt = items.filter((i) => i.mesRef === mesUltimo).reduce((s, i) => s + i.valor, 0);
+      const tPen = items.filter((i) => i.mesRef === mesPenultimo).reduce((s, i) => s + i.valor, 0);
+      varMesAMes = calcVar(tUlt, tPen);
+    }
+
+    return {
+      varPeriodoAnt: calcVar(totalGeral, totalAnt),
+      varAnoAnt: calcVar(totalGeral, totalAno),
+      labelPeriodoAnt: n === 1
+        ? `${mesLongo(antInicio)} x ${mesLongo(primeiro)}`
+        : `${mesLongo(antInicio)} a ${mesLongo(antFim)} x ${mesLongo(primeiro)} a ${mesLongo(ultimo)}`,
+      labelAnoAnt: n === 1
+        ? `${mesLongo(anoAntInicio)} x ${mesLongo(primeiro)}`
+        : `${mesLongo(anoAntInicio)} a ${mesLongo(anoAntFim)} x ${mesLongo(primeiro)} a ${mesLongo(ultimo)}`,
+      totalPeriodoAnt: totalAnt,
+      totalAnoAnt: totalAno,
+      varMesAMes,
+      mesUltimo,
+      mesPenultimo,
+    };
+  }, [meses, items, totalGeral]);
 
   return (
     <div className="space-y-6">
@@ -95,20 +198,85 @@ export default function MacroView({
       </Card>
 
       {/* KPIs macro */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card><div className="text-xs text-zinc-500 uppercase tracking-wider">Total no período</div><div className={`text-2xl font-semibold mt-1 ${colorTotal}`}>{brl(totalGeral)}</div></Card>
         <Card><div className="text-xs text-zinc-500 uppercase tracking-wider">Média mensal</div><div className="text-2xl font-semibold mt-1">{brl(mediaMensal)}</div></Card>
         <Card>
-          <div className="text-xs text-zinc-500 uppercase tracking-wider">Variação 1º → último mês</div>
-          <div className={`text-2xl font-semibold mt-1 inline-flex items-center gap-1 ${
-            variacao > 0 ? "text-danger" : variacao < 0 ? "text-success" : "text-zinc-300"
-          }`}>
-            {variacao > 0 ? <ArrowUp size={18} /> : variacao < 0 ? <ArrowDown size={18} /> : <Minus size={18} />}
-            {Math.abs(variacao).toFixed(1)}%
-          </div>
+          <div className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Evolução no período</div>
+          {meses.length >= 2 ? (
+            <ResponsiveContainer width="100%" height={100}>
+              <LineChart data={meses.map((m) => ({ mes: mesRefBR(m), valor: totaisMes[m] || 0 }))} margin={{ left: 0, right: 5, top: 5, bottom: 0 }}>
+                <XAxis dataKey="mes" stroke="var(--chart-axis)" fontSize={9} tickLine={false} axisLine={false} interval={meses.length > 6 ? Math.floor(meses.length / 4) : 0} />
+                <YAxis hide />
+                <Tooltip
+                  contentStyle={{ background: "var(--chart-tooltip-bg)", border: "1px solid var(--chart-tooltip-border)", borderRadius: 6, fontSize: 11, color: "var(--chart-tooltip-text)" }}
+                  itemStyle={{ color: "var(--chart-tooltip-text)" }}
+                  labelStyle={{ color: "var(--chart-tooltip-text)", fontWeight: 600 }}
+                  formatter={(v: number) => brl(v)}
+                />
+                <Line type="linear" dataKey="valor" stroke="#EF4444" strokeWidth={2} dot={{ r: 3, fill: "#EF4444" }} name="Despesas" />
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="text-sm text-zinc-500 py-4 text-center">Selecione 2+ meses</div>
+          )}
         </Card>
-        <Card><div className="text-xs text-zinc-500 uppercase tracking-wider">Lançamentos</div><div className="text-2xl font-semibold mt-1">{filtered.length}</div></Card>
+        <Card>
+          <div className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Top 5 categorias</div>
+          {(() => {
+            const catData = Object.entries(
+              filtered.reduce<Record<string, number>>((acc, i) => { acc[i.categoria] = (acc[i.categoria] || 0) + i.valor; return acc; }, {})
+            )
+              .sort((a, b) => b[1] - a[1])
+              .slice(0, 5)
+              .map(([name, valor]) => ({ name, valor }));
+            const cores = ["#3B82F6","#22C55E","#F59E0B","#8B5CF6","#EF4444"];
+            if (catData.length === 0) return <div className="text-sm text-zinc-500 py-4 text-center">Sem dados</div>;
+            const h = Math.max(80, catData.length * 22);
+            return (
+              <ResponsiveContainer width="100%" height={h}>
+                <BarChart data={catData} layout="vertical" margin={{ left: 0, right: 0, top: 0, bottom: 0 }}>
+                  <XAxis type="number" hide />
+                  <YAxis type="category" dataKey="name" stroke="var(--chart-axis)" fontSize={10} tickLine={false} axisLine={false} width={80} />
+                  <Tooltip
+                    contentStyle={{ background: "var(--chart-tooltip-bg)", border: "1px solid var(--chart-tooltip-border)", borderRadius: 6, fontSize: 11, color: "var(--chart-tooltip-text)" }}
+                    itemStyle={{ color: "var(--chart-tooltip-text)" }}
+                    labelStyle={{ color: "var(--chart-tooltip-text)", fontWeight: 600 }}
+                    formatter={(v: number) => brl(v)}
+                  />
+                  <Bar dataKey="valor" radius={[0, 4, 4, 0]} name="Total">
+                    {catData.map((_, i) => <Cell key={i} fill={cores[i % cores.length]} />)}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            );
+          })()}
+        </Card>
       </div>
+
+      {/* Informativo mês a mês — só com exatamente 2 meses consecutivos */}
+      {meses.length === 2 && mesUltimo && mesPenultimo && (() => {
+        const [y1, m1] = mesPenultimo.split("-").map(Number);
+        const [y2, m2] = mesUltimo.split("-").map(Number);
+        const consecutivo = (y2 * 12 + m2) - (y1 * 12 + m1) === 1;
+        if (!consecutivo) return null;
+        return (
+          <div className={`flex items-center gap-2 text-sm px-3 py-2 rounded-lg ${
+            varMesAMes > 0 ? "bg-danger/5 text-danger" : varMesAMes < 0 ? "bg-success/5 text-success" : "bg-surface2 text-zinc-400"
+          }`}>
+            {varMesAMes > 0 ? <TrendingUp size={16} /> : varMesAMes < 0 ? <TrendingDown size={16} /> : <Minus size={16} />}
+            <span>
+              <span className="font-medium">{mesRefBR(mesUltimo)}</span>
+              {varMesAMes > 0
+                ? ` gastou ${Math.abs(varMesAMes).toFixed(1)}% a mais que `
+                : varMesAMes < 0
+                  ? ` gastou ${Math.abs(varMesAMes).toFixed(1)}% a menos que `
+                  : ` manteve o mesmo gasto que `}
+              <span className="font-medium">{mesRefBR(mesPenultimo)}</span>
+            </span>
+          </div>
+        );
+      })()}
 
       {/* Pivot table */}
       <Card title="Comparativo mês a mês">

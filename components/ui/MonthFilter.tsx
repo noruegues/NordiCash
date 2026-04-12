@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export type MonthFilterValue =
   | { mode: "current" }
@@ -26,6 +26,10 @@ export default function MonthFilter({
 }) {
   const now = new Date().toISOString().slice(0, 7);
   const [openCustom, setOpenCustom] = useState(value.mode === "range" || value.mode === "month");
+
+  useEffect(() => {
+    if (value.mode === "month" || value.mode === "range") setOpenCustom(true);
+  }, [value.mode]);
 
   return (
     <div className="flex flex-wrap items-center gap-2">

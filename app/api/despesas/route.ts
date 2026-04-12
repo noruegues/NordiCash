@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, handleError, pick } from '@/lib/api-helpers'
 
-const ALLOWED_FIELDS = ['descricao', 'categoria', 'valor', 'data', 'mesRef', 'forma', 'contaId', 'cartaoId', 'recorrencia', 'recorrenciaMeses', 'emprestado', 'pago']
+const ALLOWED_FIELDS = ['descricao', 'categoria', 'valor', 'data', 'mesRef', 'forma', 'contaId', 'cartaoId', 'recorrencia', 'recorrenciaMeses', 'groupId', 'emprestado', 'pago']
 
 export async function GET() {
   try {
@@ -47,8 +47,14 @@ export async function PATCH(req: Request) {
 export async function DELETE(req: Request) {
   try {
     const session = await requireAuth()
-    const { id } = await req.json()
-    await prisma.despesa.deleteMany({ where: { id, userId: session.userId } })
+    const { id, groupId } = await req.json()
+
+    if (groupId) {
+      await prisma.despesa.deleteMany({ where: { groupId, userId: session.userId } })
+    } else {
+      await prisma.despesa.deleteMany({ where: { id, userId: session.userId } })
+    }
+
     return NextResponse.json({ ok: true })
   } catch (e) { return handleError(e) }
 }

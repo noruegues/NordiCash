@@ -2,12 +2,12 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, handleError, pick } from '@/lib/api-helpers'
 
-const ALLOWED_FIELDS = ['nome', 'banco', 'bandeira', 'cor', 'limite', 'diaVencimento', 'faturaPagaMes']
+const ALLOWED_FIELDS = ['nome', 'banco', 'bandeira', 'cor', 'limite', 'diaVencimento', 'faturaPagaMes', 'isDefault', 'ordem']
 
 export async function GET() {
   try {
     const session = await requireAuth()
-    const cartoes = await prisma.cartao.findMany({ where: { userId: session.userId }, orderBy: { createdAt: 'desc' } })
+    const cartoes = await prisma.cartao.findMany({ where: { userId: session.userId }, orderBy: [{ ordem: 'asc' }, { createdAt: 'desc' }] })
     return NextResponse.json(cartoes)
   } catch (e) { return handleError(e) }
 }
@@ -25,6 +25,26 @@ export async function PATCH(req: Request) {
   try {
     const session = await requireAuth()
     const body = await req.json()
+
+    // Marcar como default: limpa os outros e marca este
+    if (body.setDefault && body.id) {
+      await prisma.$transaction([
+        prisma.cartao.updateMany({ where: { userId: session.userId }, data: { isDefault: false } }),
+        prisma.cartao.updateMany({ where: { id: body.id, userId: session.userId }, data: { isDefault: true } }),
+      ])
+      return NextResponse.json({ ok: true })
+    }
+
+    // Reordenar cartões
+    if (body.reorder && Array.isArray(body.ids)) {
+      await prisma.$transaction(
+        body.ids.map((id: string, i: number) =>
+          prisma.cartao.updateMany({ where: { id, userId: session.userId }, data: { ordem: i } })
+        )
+      )
+      return NextResponse.json({ ok: true })
+    }
+
     const { id } = body
     const data = pick(body, ALLOWED_FIELDS)
     await prisma.cartao.updateMany({ where: { id, userId: session.userId }, data })

@@ -21,7 +21,7 @@ export async function POST(req: Request) {
       data: { login, senhaHash, nome, email, plano: 'Free' },
     })
 
-    const token = signToken({ userId: user.id, login: user.login, isAdmin: user.isAdmin })
+    const token = signToken({ userId: user.id, login: user.login, isAdmin: user.isAdmin, isSuporte: user.isSuporte })
 
     const res = NextResponse.json({
       user: { id: user.id, login: user.login, nome: user.nome, email: user.email, plano: user.plano, isAdmin: user.isAdmin, theme: user.theme, welcomeSeen: user.welcomeSeen, createdAt: user.createdAt },

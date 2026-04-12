@@ -38,6 +38,7 @@ export type Despesa = {
   cartaoId?: string;
   recorrencia: RecorrenciaTipo;
   recorrenciaMeses?: number;
+  groupId?: string;
   emprestado?: boolean;
   pago?: boolean;
 };
@@ -51,6 +52,8 @@ export type Cartao = {
   limite: number;
   diaVencimento: number;
   faturaPagaMes?: string;
+  isDefault?: boolean;
+  ordem?: number;
 };
 
 export type Investimento = {
@@ -142,10 +145,13 @@ type State = {
   addDespesa: (d: Omit<Despesa, "id">) => Promise<void>;
   updateDespesa: (id: string, d: Partial<Despesa>) => Promise<void>;
   removeDespesa: (id: string) => Promise<void>;
+  removeDespesaGroup: (groupId: string) => Promise<void>;
 
   addCartao: (c: Omit<Cartao, "id">) => Promise<void>;
   updateCartao: (id: string, c: Partial<Cartao>) => Promise<void>;
   removeCartao: (id: string) => Promise<void>;
+  setCartaoDefault: (id: string) => Promise<void>;
+  reorderCartoes: (ids: string[]) => Promise<void>;
   marcarFaturaPaga: (id: string, mes: string) => Promise<void>;
   desmarcarFaturaPaga: (id: string, mes: string) => Promise<void>;
 
@@ -239,6 +245,10 @@ export const useStore = create<State>()((set, get) => ({
     await api("/api/despesas", "DELETE", { id });
     set((s) => ({ despesas: s.despesas.filter((x) => x.id !== id) }));
   },
+  removeDespesaGroup: async (groupId) => {
+    await api("/api/despesas", "DELETE", { groupId });
+    set((s) => ({ despesas: s.despesas.filter((x) => x.groupId !== groupId) }));
+  },
 
   // Cartões
   addCartao: async (c) => {
@@ -252,6 +262,21 @@ export const useStore = create<State>()((set, get) => ({
   removeCartao: async (id) => {
     await api("/api/cartoes", "DELETE", { id });
     set((s) => ({ cartoes: s.cartoes.filter((x) => x.id !== id) }));
+  },
+  setCartaoDefault: async (id) => {
+    await api("/api/cartoes", "PATCH", { id, setDefault: true });
+    set((s) => ({
+      cartoes: s.cartoes.map((c) => ({ ...c, isDefault: c.id === id })),
+    }));
+  },
+  reorderCartoes: async (ids) => {
+    await api("/api/cartoes", "PATCH", { reorder: true, ids });
+    set((s) => ({
+      cartoes: ids.map((id, i) => {
+        const c = s.cartoes.find((x) => x.id === id)!;
+        return { ...c, ordem: i };
+      }),
+    }));
   },
   marcarFaturaPaga: async (id, mes) => {
     // 1. Marca o cartão

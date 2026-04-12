@@ -7,13 +7,13 @@ function getSecret(): string {
   return s
 }
 
-export function signToken(payload: { userId: string; login: string; isAdmin: boolean }) {
+export function signToken(payload: { userId: string; login: string; isAdmin: boolean; isSuporte: boolean }) {
   return jwt.sign(payload, getSecret(), { expiresIn: '7d' })
 }
 
 export function verifyToken(token: string) {
   try {
-    return jwt.verify(token, getSecret()) as unknown as { userId: string; login: string; isAdmin: boolean }
+    return jwt.verify(token, getSecret()) as unknown as { userId: string; login: string; isAdmin: boolean; isSuporte: boolean }
   } catch {
     return null
   }

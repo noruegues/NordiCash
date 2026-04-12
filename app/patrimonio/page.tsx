@@ -10,6 +10,7 @@ import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxi
 import { useStore, type Bem } from "@/lib/store";
 import { projecaoPortfolio } from "@/lib/calculations";
 import { brl } from "@/lib/format";
+import MoneyInput from "@/components/ui/MoneyInput";
 import { Wallet, Plus, Pencil, Trash2, TrendingUp, TrendingDown, Landmark, Info, RefreshCw } from "lucide-react";
 import { useIndicadores } from "@/lib/indicadores";
 import ExportButton from "@/components/ui/ExportButton";
@@ -268,8 +269,8 @@ export default function PatrimonioPage() {
               <input type="range" min={1} max={20} value={horizonteAnos} onChange={(e) => setHorizonteAnos(parseInt(e.target.value))} className="w-full accent-primary" />
             </div>
             <div>
-              <label className="label">Aporte mensal extra (R$)</label>
-              <input type="number" className="input" value={aporteExtra || ""} onChange={(e) => setAporteExtra(parseFloat(e.target.value) || 0)} />
+              <label className="label">Aporte mensal extra</label>
+              <MoneyInput value={aporteExtra} onChange={(v) => setAporteExtra(v)} />
             </div>
             <div className="col-span-2">
               <label className="flex items-center gap-2 text-sm text-zinc-300">
@@ -490,12 +491,12 @@ function BemModal({
             <input type="number" className="input" value={f.anosUso || ""} onChange={(e) => setF({ ...f, anosUso: parseInt(e.target.value) || 0 })} />
           </div>
           <div>
-            <label className="label">Valor de compra (R$)</label>
-            <input type="number" className="input" required value={f.valorCompra || ""} onChange={(e) => setF({ ...f, valorCompra: parseFloat(e.target.value) || 0 })} />
+            <label className="label">Valor de compra</label>
+            <MoneyInput required value={f.valorCompra} onChange={(v) => setF({ ...f, valorCompra: v })} />
           </div>
           <div>
-            <label className="label">Valor de mercado (R$)</label>
-            <input type="number" className="input" required value={f.valorMercado || ""} onChange={(e) => setF({ ...f, valorMercado: parseFloat(e.target.value) || 0 })} />
+            <label className="label">Valor de mercado</label>
+            <MoneyInput required value={f.valorMercado} onChange={(v) => setF({ ...f, valorMercado: v })} />
           </div>
 
           <div className="col-span-2 border-t border-border pt-3">
@@ -534,8 +535,8 @@ function BemModal({
           </div>
 
           <div className="col-span-2">
-            <label className="label">Dívida restante (R$)</label>
-            <input type="number" className="input" value={f.dividaRestante || ""} onChange={(e) => setF({ ...f, dividaRestante: parseFloat(e.target.value) || 0 })} />
+            <label className="label">Dívida restante</label>
+            <MoneyInput value={f.dividaRestante} onChange={(v) => setF({ ...f, dividaRestante: v })} />
           </div>
         </div>
         <div className="flex gap-2 justify-end pt-2">

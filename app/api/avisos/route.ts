@@ -10,6 +10,9 @@ export async function GET() {
   const user = await prisma.user.findUnique({ where: { id: session.userId } })
   if (!user) return NextResponse.json([])
 
+  // Atualiza lastSeenAt silenciosamente (fire-and-forget)
+  prisma.user.update({ where: { id: session.userId }, data: { lastSeenAt: new Date() } }).catch(() => {})
+
   const avisos = await prisma.aviso.findMany({
     where: {
       ativo: true,

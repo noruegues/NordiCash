@@ -14,6 +14,7 @@ body { font-family: 'DM Sans', Inter, system-ui, sans-serif; -webkit-font-smooth
   --chart-tooltip-bg: #13161B;
   --chart-tooltip-border: #23272F;
   --chart-tooltip-text: #E5E7EB;
+  --color-surface: #13161B;
 }
 html.light {
   --chart-grid: #E2E8F0;
@@ -21,6 +22,7 @@ html.light {
   --chart-tooltip-bg: #FFFFFF;
   --chart-tooltip-border: #CBD5E1;
   --chart-tooltip-text: #0F172A;
+  --color-surface: #FFFFFF;
 }
 
 /* ===== LIGHT THEME OVERRIDES ===== */
@@ -62,8 +64,8 @@ html.light table.t td { color: #1E293B !important; border-color: rgba(226,232,24
 html.light table.t tr:hover td { background-color: #F8FAFC !important; }
 
 /* Modal light */
-html.light .modal-backdrop { background: rgba(15,23,42,0.3) !important; }
-html.light .modal-panel { background-color: #FFFFFF !important; border-color: #E2E8F0 !important; }
+html.light .modal-backdrop { background: rgba(15,23,42,0.5) !important; }
+html.light .modal-panel { background-color: #FFFFFF !important; border: none !important; box-shadow: 0 8px 32px rgba(0,0,0,0.15) !important; }
 
 /* Hover states light */
 html.light .hover\:bg-surface2:hover { background-color: #F1F5F9 !important; }
@@ -143,11 +145,13 @@ table.t tr:hover td { @apply bg-surface2/50; }
 
 /* Modal */
 .modal-backdrop {
-  @apply fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4;
+  @apply fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-start justify-center overflow-y-auto;
+  padding: 3rem 1rem;
   animation: fadeIn .15s ease-out;
 }
 .modal-panel {
-  @apply card w-full max-w-lg max-h-[90vh] overflow-y-auto;
+  @apply card w-full max-w-lg border-0;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
   animation: slideUp .2s ease-out;
 }
 @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }

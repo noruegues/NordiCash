@@ -10,7 +10,7 @@ export async function GET() {
   if (!user) return NextResponse.json({ user: null }, { status: 401 })
 
   return NextResponse.json({
-    user: { id: user.id, login: user.login, nome: user.nome, email: user.email, plano: user.plano, avatar: user.avatar, isAdmin: user.isAdmin, theme: user.theme, welcomeSeen: user.welcomeSeen, createdAt: user.createdAt },
+    user: { id: user.id, login: user.login, nome: user.nome, email: user.email, plano: user.plano, avatar: user.avatar, isAdmin: user.isAdmin, isSuporte: user.isSuporte, theme: user.theme, welcomeSeen: user.welcomeSeen, createdAt: user.createdAt },
   })
 }
 
@@ -27,6 +27,6 @@ export async function PATCH(req: Request) {
 
   const user = await prisma.user.update({ where: { id: session.userId }, data: update })
   return NextResponse.json({
-    user: { id: user.id, login: user.login, nome: user.nome, email: user.email, plano: user.plano, avatar: user.avatar, isAdmin: user.isAdmin, theme: user.theme, welcomeSeen: user.welcomeSeen, createdAt: user.createdAt },
+    user: { id: user.id, login: user.login, nome: user.nome, email: user.email, plano: user.plano, avatar: user.avatar, isAdmin: user.isAdmin, isSuporte: user.isSuporte, theme: user.theme, welcomeSeen: user.welcomeSeen, createdAt: user.createdAt },
   })
 }

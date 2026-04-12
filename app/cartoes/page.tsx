@@ -1,13 +1,13 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import PageHeader from "@/components/ui/PageHeader";
 import Modal from "@/components/ui/Modal";
 import CreditCardVisual from "@/components/cards/CreditCardVisual";
 import ProgressBar from "@/components/ui/ProgressBar";
 import { useStore, type Cartao, type Bandeira, usoCartao } from "@/lib/store";
-import { brl, dataBR } from "@/lib/format";
-import { Plus, Pencil, Trash2, AlertTriangle, CheckCircle2, Undo2 } from "lucide-react";
+import { brl, dataBR, mesRefBR } from "@/lib/format";
+import { Plus, Pencil, Trash2, AlertTriangle, CheckCircle2, Undo2, Star, GripVertical, ChevronLeft, ChevronRight } from "lucide-react";
 import UpgradeModal from "@/components/UpgradeModal";
 import MoneyInput from "@/components/ui/MoneyInput";
 import { useCurrentUser, getPlanLimit } from "@/lib/auth";
@@ -15,12 +15,57 @@ import ExportButton from "@/components/ui/ExportButton";
 import { exportPDF, exportExcel } from "@/lib/export";
 
 export default function CartoesPage() {
-  const { cartoes, despesas, addCartao, updateCartao, removeCartao, marcarFaturaPaga, desmarcarFaturaPaga } = useStore();
+  const { cartoes, despesas, addCartao, updateCartao, removeCartao, setCartaoDefault, reorderCartoes, marcarFaturaPaga, desmarcarFaturaPaga } = useStore();
   const user = useCurrentUser();
   const [selected, setSelected] = useState<string | null>(cartoes[0]?.id ?? null);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Cartao | null>(null);
   const [upgrade, setUpgrade] = useState(false);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState<number | null>(null);
+  const dragNode = useRef<HTMLDivElement | null>(null);
+  const dragGhost = useRef<HTMLDivElement | null>(null);
+
+  const handleDragStart = useCallback((e: React.DragEvent, id: string, node: HTMLDivElement) => {
+    setDragId(id);
+    dragNode.current = node;
+    e.dataTransfer.effectAllowed = "move";
+    // Cria clone do cartão como drag image — mantém vivo até dragEnd
+    const clone = node.cloneNode(true) as HTMLDivElement;
+    clone.style.width = `${node.offsetWidth}px`;
+    clone.style.position = "fixed";
+    clone.style.top = "-9999px";
+    clone.style.left = "-9999px";
+    clone.style.zIndex = "-1";
+    clone.style.opacity = "0.9";
+    clone.style.borderRadius = "12px";
+    clone.style.boxShadow = "0 12px 32px rgba(0,0,0,0.4)";
+    clone.style.transform = "rotate(-2deg) scale(0.95)";
+    clone.style.pointerEvents = "none";
+    document.body.appendChild(clone);
+    dragGhost.current = clone;
+    e.dataTransfer.setDragImage(clone, node.offsetWidth / 2, 40);
+  }, []);
+
+  const handleDragEnd = useCallback(() => {
+    // Remove o ghost clone
+    if (dragGhost.current) {
+      document.body.removeChild(dragGhost.current);
+      dragGhost.current = null;
+    }
+    if (dragId !== null && dragOver !== null) {
+      const fromIdx = cartoes.findIndex((c) => c.id === dragId);
+      if (fromIdx !== -1 && fromIdx !== dragOver) {
+        const ids = cartoes.map((c) => c.id);
+        const [moved] = ids.splice(fromIdx, 1);
+        ids.splice(dragOver, 0, moved);
+        reorderCartoes(ids);
+      }
+    }
+    setDragId(null);
+    setDragOver(null);
+    dragNode.current = null;
+  }, [dragId, dragOver, cartoes, reorderCartoes]);
 
   const limit = user ? getPlanLimit(user.plano, "cartoes") : Infinity;
   const atLimit = cartoes.length >= limit;
@@ -99,14 +144,51 @@ export default function CartoesPage() {
         <Card><div className="text-sm text-zinc-500 py-6 text-center">Nenhum cartão cadastrado</div></Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {cartoes.map((c) => (
-            <CreditCardVisual
+          {cartoes.map((c, idx) => (
+            <div
               key={c.id}
-              cartao={c}
-              usado={usoCartao(c.id, despesas, c.faturaPagaMes)}
-              selected={selected === c.id}
-              onClick={() => setSelected(c.id)}
-            />
+              className={`relative group transition-all ${
+                dragId === c.id
+                  ? "opacity-30 scale-95 border-2 border-dashed border-zinc-500 rounded-xl"
+                  : dragOver === idx && dragId !== c.id
+                    ? "border-2 border-dashed border-primary/50 rounded-xl scale-[1.02]"
+                    : ""
+              }`}
+              draggable
+              onDragStart={(e) => handleDragStart(e, c.id, e.currentTarget as HTMLDivElement)}
+              onDragEnd={handleDragEnd}
+              onDragOver={(e) => { e.preventDefault(); setDragOver(idx); }}
+              onDragLeave={() => { if (dragOver === idx) setDragOver(null); }}
+            >
+              {/* Controles: grip + estrela */}
+              <div className="absolute top-2 right-2 z-10 flex items-center gap-1">
+                {cartoes.length > 1 && (
+                  <div
+                    className="p-1 rounded cursor-grab text-zinc-500 opacity-0 group-hover:opacity-100 hover:text-zinc-200 transition active:cursor-grabbing"
+                    title="Arrastar para reordenar"
+                  >
+                    <GripVertical size={16} />
+                  </div>
+                )}
+                <button
+                  className={`p-1 rounded transition ${
+                    c.isDefault
+                      ? "text-yellow-400"
+                      : "text-zinc-500 opacity-0 group-hover:opacity-100 hover:text-yellow-400"
+                  }`}
+                  onClick={(e) => { e.stopPropagation(); setCartaoDefault(c.id); }}
+                  title={c.isDefault ? "Cartão padrão" : "Definir como padrão"}
+                >
+                  <Star size={16} fill={c.isDefault ? "currentColor" : "none"} />
+                </button>
+              </div>
+              <CreditCardVisual
+                cartao={c}
+                usado={usoCartao(c.id, despesas, c.faturaPagaMes)}
+                selected={selected === c.id}
+                onClick={() => setSelected(c.id)}
+              />
+            </div>
           ))}
         </div>
       )}
@@ -149,39 +231,64 @@ export default function CartoesPage() {
               </Card>
 
               <Card
-                title={`Fatura ${mesFatura}`}
+                title={
+                  <div className="flex items-center gap-2">
+                    <span>Fatura</span>
+                    <div className="flex items-center gap-1 ml-1">
+                      <button
+                        className="p-0.5 rounded hover:bg-surface2 text-zinc-400 hover:text-zinc-100 transition"
+                        onClick={() => {
+                          const [y, m] = mesFatura.split("-").map(Number);
+                          const d = new Date(y, m - 2, 1);
+                          setMesFatura(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+                        }}
+                      >
+                        <ChevronLeft size={16} />
+                      </button>
+                      <span className="text-sm font-medium text-zinc-300 min-w-[80px] text-center">
+                        {mesRefBR(mesFatura)}
+                      </span>
+                      <button
+                        className="p-0.5 rounded hover:bg-surface2 text-zinc-400 hover:text-zinc-100 transition"
+                        onClick={() => {
+                          const [y, m] = mesFatura.split("-").map(Number);
+                          const d = new Date(y, m, 1);
+                          setMesFatura(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+                        }}
+                      >
+                        <ChevronRight size={16} />
+                      </button>
+                    </div>
+                  </div>
+                }
                 className="lg:col-span-2"
                 action={
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="month"
-                      className="input !h-8 !text-xs !py-1"
-                      value={mesFatura}
-                      onChange={(e) => setMesFatura(e.target.value)}
-                    />
-                    {faturaPaga ? (
-                      <button
-                        className="btn btn-sm btn-ghost"
-                        onClick={() => desmarcarFaturaPaga(cartao.id, mesFatura)}
-                      >
-                        <Undo2 size={14} /> Desfazer
-                      </button>
-                    ) : (
-                      <button
-                        className={`btn btn-sm ${overdue ? "btn-danger" : "btn-success"}`}
-                        onClick={() => marcarFaturaPaga(cartao.id, mesFatura)}
-                      >
-                        <CheckCircle2 size={14} /> Marcar fatura paga
-                      </button>
-                    )}
-                  </div>
+                  itensMes.length > 0 ? (
+                    <div className="flex items-center gap-2">
+                      {faturaPaga ? (
+                        <button
+                          className="btn btn-sm btn-ghost"
+                          onClick={() => desmarcarFaturaPaga(cartao.id, mesFatura)}
+                        >
+                          <Undo2 size={14} /> Cancelar pagamento
+                        </button>
+                      ) : (
+                        <button
+                          className={`btn btn-sm ${overdue ? "btn-danger" : "btn-success"}`}
+                          onClick={() => marcarFaturaPaga(cartao.id, mesFatura)}
+                        >
+                          <CheckCircle2 size={14} /> Marcar fatura paga
+                        </button>
+                      )}
+                    </div>
+                  ) : undefined
                 }
               >
                 <div className="mb-3 flex items-center justify-between flex-wrap gap-2">
                   <div className="text-sm text-zinc-400">
                     Vencimento dia {cartao.diaVencimento}
-                    {overdue && <span className="ml-2 pill pill-danger">EM ATRASO</span>}
-                    {faturaPaga && <span className="ml-2 pill pill-success">PAGA</span>}
+                    {itensMes.length > 0 && overdue && <span className="ml-2 pill pill-danger">EM ATRASO</span>}
+                    {itensMes.length > 0 && faturaPaga && <span className="ml-2 pill pill-success">PAGA</span>}
                   </div>
                   <div className="text-right">
                     <div className="text-xs text-zinc-500 uppercase tracking-wider">Total da fatura</div>

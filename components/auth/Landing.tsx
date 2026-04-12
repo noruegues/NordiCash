@@ -460,7 +460,7 @@ export default function Landing() {
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-2.5">
               <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#4F6EF7] to-[#7C3AED] grid place-items-center text-white font-bold text-[10px] shadow-sm">N</div>
-              <span className="text-[13px] text-slate-400 font-medium">NordiCash v1.0.0</span>
+              <span className="text-[13px] text-slate-400 font-medium">NordiCash v1.2.0</span>
             </div>
             <div className="flex items-center gap-8 text-[13px] text-slate-400">
               <a href="#features" className="hover:text-slate-600 transition">Funcionalidades</a>

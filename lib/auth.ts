@@ -12,6 +12,7 @@ export type User = {
   avatar?: string;
   plano: Plano;
   isAdmin: boolean;
+  isSuporte: boolean;
   theme: string;
   welcomeSeen: boolean;
   createdAt: string;

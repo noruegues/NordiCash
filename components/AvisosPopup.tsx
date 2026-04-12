@@ -64,11 +64,8 @@ export default function AvisosPopup() {
   const colors = colorMap[aviso.tipo] || colorMap.info;
 
   return (
-    <div className="modal-backdrop" onClick={() => dismiss(aviso.id)}>
-      <div
-        className={`modal-panel max-w-lg border ${colors.border} overflow-hidden`}
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="modal-backdrop">
+      <div className={`modal-panel max-w-lg border ${colors.border} overflow-hidden`}>
         {/* Accent bar */}
         <div className={`h-1 ${colors.accent}`} />
 
@@ -86,18 +83,11 @@ export default function AvisosPopup() {
                 </span>
               </div>
             </div>
-            <button
-              onClick={() => dismiss(aviso.id)}
-              className="text-zinc-500 hover:text-zinc-300 p-1"
-            >
-              <X size={18} />
-            </button>
+            <div className="w-5" />
           </div>
 
           {/* Mensagem */}
-          <div className="text-sm text-zinc-300 leading-relaxed whitespace-pre-wrap">
-            {aviso.mensagem}
-          </div>
+          <div className="text-sm text-zinc-300 leading-relaxed [&_b]:font-bold [&_i]:italic [&_u]:underline [&_ul]:list-disc [&_ul]:pl-5" dangerouslySetInnerHTML={{ __html: aviso.mensagem }} />
 
           {/* Footer */}
           <div className="mt-6 flex items-center justify-between">

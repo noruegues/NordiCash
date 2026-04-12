@@ -5,7 +5,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import Modal from "@/components/ui/Modal";
 import { useStore, type Despesa, type ContaBancaria, type Cartao, type FormaPagamento, type RecorrenciaTipo } from "@/lib/store";
 import { brl, mesRefBR } from "@/lib/format";
-import { Plus, Pencil, Trash2, Check, CheckCheck } from "lucide-react";
+import { Plus, Pencil, Trash2, Check, CheckCheck, AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react";
 import MacroView from "@/components/MacroView";
 import MoneyInput from "@/components/ui/MoneyInput";
 import MonthFilter, { applyMonthFilter, type MonthFilterValue } from "@/components/ui/MonthFilter";
@@ -20,7 +20,7 @@ import { Upload } from "lucide-react";
 type Tab = "lancamentos" | "macro";
 
 export default function DespesasPage() {
-  const { despesas: allDespesas, contas, cartoes, addDespesa, updateDespesa, removeDespesa } = useStore();
+  const { despesas: allDespesas, contas, cartoes, addDespesa, updateDespesa, removeDespesa, removeDespesaGroup } = useStore();
   const user = useCurrentUser();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Despesa | null>(null);
@@ -29,6 +29,8 @@ export default function DespesasPage() {
   const [monthFilter, setMonthFilter] = useState<MonthFilterValue>({ mode: "current" });
   const [importOpen, setImportOpen] = useState(false);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Despesa | null>(null);
+  const [dupAlert, setDupAlert] = useState<{ items: Omit<Despesa, "id">[]; existing: string } | null>(null);
 
   const despesas = applyMonthFilter(allDespesas, monthFilter);
   const total = despesas.reduce((s, d) => s + d.valor, 0);
@@ -50,6 +52,21 @@ export default function DespesasPage() {
     if (d.contaId) return contas.find((c) => c.id === d.contaId)?.nome ?? "—";
     return "—";
   };
+
+  // Mês ativo para navegação com setas
+  const mesAtivo = monthFilter.mode === "current"
+    ? new Date().toISOString().slice(0, 7)
+    : monthFilter.mode === "month"
+      ? monthFilter.mes
+      : null;
+
+  function shiftMonth(offset: number) {
+    const base = mesAtivo || new Date().toISOString().slice(0, 7);
+    const [y, m] = base.split("-").map(Number);
+    const d = new Date(y, m - 1 + offset, 1);
+    const novo = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    setMonthFilter({ mode: "month", mes: novo });
+  }
 
   return (
     <div className="space-y-6">
@@ -141,7 +158,32 @@ export default function DespesasPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card
-          title="Lançamentos"
+          title={
+            <div className="flex items-center gap-2">
+              <span>Lançamentos</span>
+              {(monthFilter.mode === "current" || monthFilter.mode === "month") && (
+                <div className="flex items-center gap-1 ml-2">
+                  <button
+                    className="p-0.5 rounded hover:bg-surface2 text-zinc-400 hover:text-zinc-100 transition"
+                    onClick={() => shiftMonth(-1)}
+                    title="Mês anterior"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  <span className="text-sm font-medium text-zinc-300 min-w-[80px] text-center">
+                    {mesRefBR(mesAtivo || new Date().toISOString().slice(0, 7))}
+                  </span>
+                  <button
+                    className="p-0.5 rounded hover:bg-surface2 text-zinc-400 hover:text-zinc-100 transition"
+                    onClick={() => shiftMonth(1)}
+                    title="Próximo mês"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              )}
+            </div>
+          }
           className="lg:col-span-2"
           action={
             filtered.length > 0 && filtered.some((d) => !d.pago) ? (
@@ -188,7 +230,7 @@ export default function DespesasPage() {
                     <td className="text-right">
                       <div className="inline-flex gap-1">
                         <button className="btn btn-ghost btn-sm btn-icon" onClick={() => { setEditing(d); setOpen(true); }}><Pencil size={13} /></button>
-                        <button className="btn btn-ghost btn-sm btn-icon hover:!text-danger" onClick={() => confirm("Apagar despesa?") && removeDespesa(d.id)}><Trash2 size={13} /></button>
+                        <button className="btn btn-ghost btn-sm btn-icon hover:!text-danger" onClick={() => setDeleteTarget(d)}><Trash2 size={13} /></button>
                       </div>
                     </td>
                   </tr>
@@ -229,14 +271,45 @@ export default function DespesasPage() {
         onSave={async (items) => {
           if (editing) {
             await updateDespesa(editing.id, items[0]);
-          } else {
-            for (const d of items) await addDespesa(d);
+            setOpen(false);
+            return;
           }
+          // Detecção de duplicata: mesmo nome base no mesmo mês
+          const baseDesc = items[0].descricao.replace(/\s*\(\d+\/\d+\)\s*$/, "").trim();
+          const dup = allDespesas.find((d) => {
+            const existBase = d.descricao.replace(/\s*\(\d+\/\d+\)\s*$/, "").trim();
+            return existBase.toLowerCase() === baseDesc.toLowerCase() && d.mesRef === items[0].mesRef;
+          });
+          if (dup) {
+            setDupAlert({ items, existing: dup.descricao });
+            return;
+          }
+          for (const d of items) await addDespesa(d);
           setOpen(false);
         }}
       />
       <ImportModal open={importOpen} onClose={() => setImportOpen(false)} />
       <UpgradeModal open={upgradeOpen} onClose={() => setUpgradeOpen(false)} reason="A importação de extratos está disponível nos planos Pro e Premium." />
+      <DuplicateAlertDialog
+        alert={dupAlert}
+        onClose={() => setDupAlert(null)}
+        onConfirm={async () => {
+          for (const d of dupAlert!.items) await addDespesa(d);
+          setDupAlert(null);
+          setOpen(false);
+        }}
+        onRename={() => {
+          setDupAlert(null);
+          // Mantém modal aberto para editar o nome
+        }}
+      />
+      <DeleteDespesaDialog
+        despesa={deleteTarget}
+        groupCount={deleteTarget?.groupId ? allDespesas.filter((d) => d.groupId === deleteTarget.groupId).length : 0}
+        onClose={() => setDeleteTarget(null)}
+        onDeleteSingle={async () => { await removeDespesa(deleteTarget!.id); setDeleteTarget(null); }}
+        onDeleteGroup={async () => { await removeDespesaGroup(deleteTarget!.groupId!); setDeleteTarget(null); }}
+      />
     </div>
   );
 }
@@ -247,7 +320,7 @@ function nextMonth(mesRef: string, offset: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-const PARCELA_OPTIONS = [2,3,4,5,6,7,8,9,10,11,12,15,18,24,36,48];
+const PARCELA_OPTIONS = Array.from({ length: 35 }, (_, i) => i + 2);
 
 function DespesaModal({
   open, onClose, contas, cartoes, editing, onSave,
@@ -258,9 +331,10 @@ function DespesaModal({
   onSave: (items: Omit<Despesa, "id">[]) => void;
 }) {
   const today = new Date().toISOString().slice(0, 10);
+  const defaultCartao = cartoes.find((c) => c.isDefault) || (cartoes.length === 1 ? cartoes[0] : null);
   const empty: Omit<Despesa, "id"> = {
     descricao: "", categoria: "", valor: 0, data: today, mesRef: today.slice(0, 7),
-    forma: "Pix", contaId: contas[0]?.id, recorrencia: "Única", emprestado: false, pago: false,
+    forma: "Pix", contaId: contas[0]?.id, cartaoId: defaultCartao?.id, recorrencia: "Única", emprestado: false, pago: false,
   };
   const [f, setF] = useState<Omit<Despesa, "id">>(empty);
 
@@ -275,7 +349,7 @@ function DespesaModal({
   const formas: FormaPagamento[] = ["Pix", "Débito", "Dinheiro", "Boleto", "Cartão"];
   const recs: RecorrenciaTipo[] = ["Única", "Recorrente", "Indeterminada"];
   const isCartao = f.forma === "Cartão";
-  const isRecorrente = f.recorrencia === "Recorrente";
+  const isRecorrente = !editing && f.recorrencia === "Recorrente";
 
   const qtdMeses = f.recorrenciaMeses ?? 2;
   const isParcela = isRecorrente && f.valor > 0 && qtdMeses > 0;
@@ -289,6 +363,7 @@ function DespesaModal({
 
     if (!isParcela) return [base];
 
+    const gId = crypto.randomUUID();
     const items: Omit<Despesa, "id">[] = [];
     for (let i = 0; i < qtdMeses; i++) {
       const mes = nextMonth(base.mesRef, i);
@@ -298,6 +373,7 @@ function DespesaModal({
         valor: valorParcela,
         mesRef: mes,
         data: `${mes}-${base.data.slice(8, 10)}`,
+        groupId: gId,
         pago: false,
       });
     }
@@ -325,7 +401,7 @@ function DespesaModal({
             />
           </div>
           <div>
-            <label className="label">{isParcela ? "Valor total" : "Valor"}</label>
+            <label className="label">{isParcela && !editing ? "Valor total" : "Valor"}</label>
             <MoneyInput required value={f.valor} onChange={(v) => setF({ ...f, valor: v })} />
           </div>
           <div>
@@ -361,24 +437,36 @@ function DespesaModal({
             </div>
           )}
 
-          <div>
-            <label className="label">Recorrência</label>
-            <select className="select" value={f.recorrencia} onChange={(e) => {
-              const rec = e.target.value as RecorrenciaTipo;
-              setF({ ...f, recorrencia: rec, recorrenciaMeses: rec === "Recorrente" ? (f.recorrenciaMeses ?? 2) : undefined });
-            }}>
-              {recs.map((x) => <option key={x}>{x}</option>)}
-            </select>
-          </div>
-          {isRecorrente && (
-            <div>
-              <label className="label">Parcelas</label>
-              <select className="select" value={qtdMeses} onChange={(e) => setF({ ...f, recorrenciaMeses: parseInt(e.target.value) })}>
-                {PARCELA_OPTIONS.map((n) => (
-                  <option key={n} value={n}>{n}x</option>
-                ))}
-              </select>
-            </div>
+          {!editing ? (
+            <>
+              <div>
+                <label className="label">Recorrência</label>
+                <select className="select" value={f.recorrencia} onChange={(e) => {
+                  const rec = e.target.value as RecorrenciaTipo;
+                  setF({ ...f, recorrencia: rec, recorrenciaMeses: rec === "Recorrente" ? (f.recorrenciaMeses ?? 2) : undefined });
+                }}>
+                  {recs.map((x) => <option key={x}>{x}</option>)}
+                </select>
+              </div>
+              {isRecorrente && (
+                <div>
+                  <label className="label">Parcelas</label>
+                  <select className="select" value={qtdMeses} onChange={(e) => setF({ ...f, recorrenciaMeses: parseInt(e.target.value) })}>
+                    {PARCELA_OPTIONS.map((n) => (
+                      <option key={n} value={n}>{n}x</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </>
+          ) : editing.recorrencia === "Recorrente" && editing.recorrenciaMeses ? (
+            <p className="col-span-2 text-xs text-warn/80">
+              Parcela {(() => { const m = editing.descricao.match(/\((\d+)\/(\d+)\)$/); return m ? `${m[1]}/${m[2]}` : `${editing.recorrenciaMeses}x`; })()} · {mesRefBR(editing.mesRef)} · compra em {new Date(editing.data + "T12:00:00").toLocaleDateString("pt-BR")}
+            </p>
+          ) : (
+            <p className="col-span-2 text-xs text-warn/80">
+              Despesa {editing.recorrencia.toLowerCase()}
+            </p>
           )}
 
           {/* Valor da parcela */}
@@ -436,6 +524,111 @@ function DespesaModal({
           </button>
         </div>
       </form>
+    </Modal>
+  );
+}
+
+function DuplicateAlertDialog({
+  alert, onClose, onConfirm, onRename,
+}: {
+  alert: { items: Omit<Despesa, "id">[]; existing: string } | null;
+  onClose: () => void;
+  onConfirm: () => void;
+  onRename: () => void;
+}) {
+  if (!alert) return null;
+  const baseDesc = alert.items[0].descricao.replace(/\s*\(\d+\/\d+\)\s*$/, "").trim();
+
+  return (
+    <Modal open={!!alert} onClose={onClose} title="Despesa duplicada" size="sm">
+      <div className="space-y-4">
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 rounded-full bg-warn/10 p-2">
+            <AlertTriangle size={20} className="text-warn" />
+          </div>
+          <div className="text-sm text-zinc-300">
+            <p>Já existe uma despesa <span className="font-semibold text-zinc-100">&quot;{alert.existing}&quot;</span> cadastrada neste mês.</p>
+            <p className="mt-1">Deseja cadastrar <span className="font-semibold text-zinc-100">&quot;{baseDesc}&quot;</span> mesmo assim?</p>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <button className="btn btn-primary w-full justify-center" onClick={onConfirm}>
+            Cadastrar mesmo assim
+          </button>
+          <button className="btn btn-soft w-full justify-center" onClick={onRename}>
+            Ajustar o nome
+          </button>
+          <button className="btn btn-ghost w-full justify-center" onClick={onClose}>
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function DeleteDespesaDialog({
+  despesa, groupCount, onClose, onDeleteSingle, onDeleteGroup,
+}: {
+  despesa: Despesa | null;
+  groupCount: number;
+  onClose: () => void;
+  onDeleteSingle: () => void;
+  onDeleteGroup: () => void;
+}) {
+  if (!despesa) return null;
+  const hasGroup = !!despesa.groupId && groupCount > 1;
+
+  return (
+    <Modal open={!!despesa} onClose={onClose} title="Apagar despesa" size="sm">
+      <div className="space-y-4">
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 rounded-full bg-danger/10 p-2">
+            <AlertTriangle size={20} className="text-danger" />
+          </div>
+          <div className="text-sm text-zinc-300">
+            {hasGroup ? (
+              <>
+                <p className="font-medium text-zinc-100 mb-1">&quot;{despesa.descricao}&quot;</p>
+                <p>Esta despesa faz parte de uma recorrência com <span className="font-semibold text-zinc-100">{groupCount} parcelas</span>. O que deseja fazer?</p>
+              </>
+            ) : (
+              <p>Tem certeza que deseja apagar <span className="font-semibold text-zinc-100">&quot;{despesa.descricao}&quot;</span>?</p>
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          {hasGroup && (
+            <>
+              <button
+                className="btn btn-danger w-full justify-center"
+                onClick={onDeleteGroup}
+              >
+                <Trash2 size={14} /> Apagar todas as {groupCount} parcelas
+              </button>
+              <button
+                className="btn btn-soft w-full justify-center"
+                onClick={onDeleteSingle}
+              >
+                Apagar somente esta parcela
+              </button>
+            </>
+          )}
+          {!hasGroup && (
+            <button
+              className="btn btn-danger w-full justify-center"
+              onClick={onDeleteSingle}
+            >
+              <Trash2 size={14} /> Apagar
+            </button>
+          )}
+          <button className="btn btn-ghost w-full justify-center" onClick={onClose}>
+            Cancelar
+          </button>
+        </div>
+      </div>
     </Modal>
   );
 }
