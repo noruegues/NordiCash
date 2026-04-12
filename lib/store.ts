@@ -24,6 +24,7 @@ export type Receita = {
   contaId?: string;
   mesRef: string;
   recorrencia: "Mensal" | "Única";
+  groupId?: string;
 };
 
 export type Despesa = {
@@ -141,6 +142,8 @@ type State = {
   addReceita: (r: Omit<Receita, "id">) => Promise<void>;
   updateReceita: (id: string, r: Partial<Receita>) => Promise<void>;
   removeReceita: (id: string) => Promise<void>;
+  removeReceitaGroup: (groupId: string) => Promise<void>;
+  removeReceitaFromMonth: (groupId: string, mesRef: string) => Promise<void>;
 
   addDespesa: (d: Omit<Despesa, "id">) => Promise<void>;
   updateDespesa: (id: string, d: Partial<Despesa>) => Promise<void>;
@@ -230,6 +233,14 @@ export const useStore = create<State>()((set, get) => ({
   removeReceita: async (id) => {
     await api("/api/receitas", "DELETE", { id });
     set((s) => ({ receitas: s.receitas.filter((x) => x.id !== id) }));
+  },
+  removeReceitaGroup: async (groupId) => {
+    await api("/api/receitas", "DELETE", { groupId });
+    set((s) => ({ receitas: s.receitas.filter((x) => x.groupId !== groupId) }));
+  },
+  removeReceitaFromMonth: async (groupId, mesRef) => {
+    await api("/api/receitas", "DELETE", { groupId, fromMonth: mesRef });
+    set((s) => ({ receitas: s.receitas.filter((x) => !(x.groupId === groupId && x.mesRef >= mesRef)) }));
   },
 
   // Despesas

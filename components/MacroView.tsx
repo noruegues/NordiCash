@@ -18,13 +18,22 @@ export default function MacroView({
   items,
   groupBy = "descricao",
   colorTotal = "text-zinc-100",
+  mode = "despesa",
   onEditGroup,
 }: {
   items: Item[];
   groupBy?: "descricao" | "categoria" | "fonte";
   colorTotal?: string;
+  mode?: "despesa" | "receita";
   onEditGroup?: (groupKey: string, groupMode: "descricao" | "categoria" | "fonte") => void;
 }) {
+  // Para despesas: subir = ruim (red), descer = bom (green)
+  // Para receitas: subir = bom (green), descer = ruim (red)
+  const upColor = mode === "receita" ? "text-success" : "text-danger";
+  const downColor = mode === "receita" ? "text-danger" : "text-success";
+  const upBg = mode === "receita" ? "bg-success/5 text-success" : "bg-danger/5 text-danger";
+  const downBg = mode === "receita" ? "bg-danger/5 text-danger" : "bg-success/5 text-success";
+  const lineColor = mode === "receita" ? "#22C55E" : "#EF4444";
   // Filtros
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -214,7 +223,7 @@ export default function MacroView({
                   labelStyle={{ color: "var(--chart-tooltip-text)", fontWeight: 600 }}
                   formatter={(v: number) => brl(v)}
                 />
-                <Line type="linear" dataKey="valor" stroke="#EF4444" strokeWidth={2} dot={{ r: 3, fill: "#EF4444" }} name="Despesas" />
+                <Line type="linear" dataKey="valor" stroke={lineColor} strokeWidth={2} dot={{ r: 3, fill: lineColor }} name={mode === "receita" ? "Receitas" : "Despesas"} />
               </LineChart>
             </ResponsiveContainer>
           ) : (
@@ -262,16 +271,16 @@ export default function MacroView({
         if (!consecutivo) return null;
         return (
           <div className={`flex items-center gap-2 text-sm px-3 py-2 rounded-lg ${
-            varMesAMes > 0 ? "bg-danger/5 text-danger" : varMesAMes < 0 ? "bg-success/5 text-success" : "bg-surface2 text-zinc-400"
+            varMesAMes > 0 ? upBg : varMesAMes < 0 ? downBg : "bg-surface2 text-zinc-400"
           }`}>
             {varMesAMes > 0 ? <TrendingUp size={16} /> : varMesAMes < 0 ? <TrendingDown size={16} /> : <Minus size={16} />}
             <span>
               <span className="font-medium">{mesRefBR(mesUltimo)}</span>
               {varMesAMes > 0
-                ? ` gastou ${Math.abs(varMesAMes).toFixed(1)}% a mais que `
+                ? ` ${mode === "receita" ? "recebeu" : "gastou"} ${Math.abs(varMesAMes).toFixed(1)}% a mais que `
                 : varMesAMes < 0
-                  ? ` gastou ${Math.abs(varMesAMes).toFixed(1)}% a menos que `
-                  : ` manteve o mesmo gasto que `}
+                  ? ` ${mode === "receita" ? "recebeu" : "gastou"} ${Math.abs(varMesAMes).toFixed(1)}% a menos que `
+                  : ` manteve o mesmo ${mode === "receita" ? "valor" : "gasto"} que `}
               <span className="font-medium">{mesRefBR(mesPenultimo)}</span>
             </span>
           </div>
@@ -334,7 +343,7 @@ export default function MacroView({
                           );
                         })}
                         <td className="text-right font-semibold">{brl(total)}</td>
-                        <td className={`text-right text-xs ${delta > 0 ? "text-danger" : delta < 0 ? "text-success" : "text-zinc-500"}`}>
+                        <td className={`text-right text-xs ${delta > 0 ? upColor : delta < 0 ? downColor : "text-zinc-500"}`}>
                           {meses.length >= 2 && first > 0 ? `${delta > 0 ? "+" : ""}${delta.toFixed(0)}%` : "—"}
                         </td>
                       </tr>

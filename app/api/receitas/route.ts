@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, handleError, pick } from '@/lib/api-helpers'
 
-const ALLOWED_FIELDS = ['fonte', 'categoria', 'valor', 'contaId', 'mesRef', 'recorrencia']
+const ALLOWED_FIELDS = ['fonte', 'categoria', 'valor', 'contaId', 'mesRef', 'recorrencia', 'groupId']
 
 export async function GET() {
   try {
@@ -36,8 +36,19 @@ export async function PATCH(req: Request) {
 export async function DELETE(req: Request) {
   try {
     const session = await requireAuth()
-    const { id } = await req.json()
-    await prisma.receita.deleteMany({ where: { id, userId: session.userId } })
+    const { id, groupId, fromMonth } = await req.json()
+
+    if (groupId && fromMonth) {
+      // Apagar do mês em diante
+      await prisma.receita.deleteMany({ where: { groupId, userId: session.userId, mesRef: { gte: fromMonth } } })
+    } else if (groupId) {
+      // Apagar todo o grupo
+      await prisma.receita.deleteMany({ where: { groupId, userId: session.userId } })
+    } else {
+      // Apagar uma só
+      await prisma.receita.deleteMany({ where: { id, userId: session.userId } })
+    }
+
     return NextResponse.json({ ok: true })
   } catch (e) { return handleError(e) }
 }

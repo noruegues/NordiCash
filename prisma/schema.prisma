@@ -61,6 +61,7 @@ model Receita {
   contaId     String?  @map("conta_id")
   mesRef      String   @map("mes_ref")
   recorrencia String   @default("Única")
+  groupId     String?  @map("group_id")
   createdAt   DateTime @default(now()) @map("created_at")
 
   user  User           @relation(fields: [userId], references: [id], onDelete: Cascade)
