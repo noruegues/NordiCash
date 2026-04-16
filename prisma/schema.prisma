@@ -104,6 +104,7 @@ model Cartao {
   cor            String   @default("#6366f1")
   limite         Float    @default(0)
   diaVencimento  Int      @map("dia_vencimento")
+  diaFechamento  Int?     @map("dia_fechamento")
   faturaPagaMes  String?  @map("fatura_paga_mes")
   isDefault      Boolean  @default(false) @map("is_default")
   ordem          Int      @default(0)

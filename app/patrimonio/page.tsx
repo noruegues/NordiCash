@@ -11,6 +11,7 @@ import { useStore, type Bem } from "@/lib/store";
 import { projecaoPortfolio } from "@/lib/calculations";
 import { brl } from "@/lib/format";
 import MoneyInput from "@/components/ui/MoneyInput";
+import NumberInput from "@/components/ui/NumberInput";
 import { Wallet, Plus, Pencil, Trash2, TrendingUp, TrendingDown, Landmark, Info, RefreshCw } from "lucide-react";
 import { useIndicadores } from "@/lib/indicadores";
 import ExportButton from "@/components/ui/ExportButton";
@@ -253,7 +254,7 @@ export default function PatrimonioPage() {
             {benchmark === "custom" ? (
               <div>
                 <label className="label">Taxa a.a. (%)</label>
-                <input type="number" step="0.1" className="input" value={taxaCustomAA} onChange={(e) => setTaxaCustomAA(parseFloat(e.target.value) || 0)} />
+                <NumberInput decimal value={taxaCustomAA} onChange={(v) => setTaxaCustomAA(v ?? 0)} />
               </div>
             ) : (
               <div>
@@ -488,7 +489,7 @@ function BemModal({
           </div>
           <div>
             <label className="label">Anos de uso</label>
-            <input type="number" className="input" value={f.anosUso || ""} onChange={(e) => setF({ ...f, anosUso: parseInt(e.target.value) || 0 })} />
+            <NumberInput min={0} value={f.anosUso || undefined} onChange={(v) => setF({ ...f, anosUso: v ?? 0 })} />
           </div>
           <div>
             <label className="label">Valor de compra</label>
@@ -522,13 +523,7 @@ function BemModal({
             <label className="label">
               Taxa anual ({f.comportamento === "desvaloriza" ? "desvalorização" : "valorização"}) — % a.a.
             </label>
-            <input
-              type="number"
-              step="0.5"
-              className="input"
-              value={f.taxaAnual ?? 0}
-              onChange={(e) => setF({ ...f, taxaAnual: parseFloat(e.target.value) || 0 })}
-            />
+            <NumberInput decimal allowNegative value={f.taxaAnual ?? 0} onChange={(v) => setF({ ...f, taxaAnual: v ?? 0 })} />
             <div className="text-xs text-zinc-500 mt-1">
               Sugerido: Imóvel +6% · Veículo −10% · Moto −8%. Use valor negativo para desvalorização.
             </div>

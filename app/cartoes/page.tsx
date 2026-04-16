@@ -10,6 +10,7 @@ import { brl, dataBR, mesRefBR } from "@/lib/format";
 import { Plus, Pencil, Trash2, AlertTriangle, CheckCircle2, Undo2, Star, GripVertical, ChevronLeft, ChevronRight } from "lucide-react";
 import UpgradeModal from "@/components/UpgradeModal";
 import MoneyInput from "@/components/ui/MoneyInput";
+import NumberInput from "@/components/ui/NumberInput";
 import { useCurrentUser, getPlanLimit } from "@/lib/auth";
 import ExportButton from "@/components/ui/ExportButton";
 import { exportPDF, exportExcel } from "@/lib/export";
@@ -89,8 +90,14 @@ export default function CartoesPage() {
 
   const alertas = useMemo(
     () =>
-      cartoes.filter((c) => c.faturaPagaMes !== mesAtual && today.getDate() > c.diaVencimento),
-    [cartoes, mesAtual]
+      cartoes.filter((c) => {
+        if (c.faturaPagaMes === mesAtual) return false;
+        if (today.getDate() <= c.diaVencimento) return false;
+        // Só alerta se houver despesas no mês atual (sem fatura não há o que pagar)
+        const temFatura = despesas.some((d) => d.cartaoId === c.id && d.mesRef === mesAtual);
+        return temFatura;
+      }),
+    [cartoes, despesas, mesAtual]
   );
 
   return (
@@ -285,10 +292,18 @@ export default function CartoesPage() {
                 }
               >
                 <div className="mb-3 flex items-center justify-between flex-wrap gap-2">
-                  <div className="text-sm text-zinc-400">
-                    Vencimento dia {cartao.diaVencimento}
-                    {itensMes.length > 0 && overdue && <span className="ml-2 pill pill-danger">EM ATRASO</span>}
-                    {itensMes.length > 0 && faturaPaga && <span className="ml-2 pill pill-success">PAGA</span>}
+                  <div className="text-sm text-zinc-400 flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <span>Vencimento dia {cartao.diaVencimento}</span>
+                    {cartao.diaFechamento && (
+                      <>
+                        <span className="text-zinc-600">•</span>
+                        <span>Fecha dia {cartao.diaFechamento}</span>
+                        <span className="text-zinc-600">•</span>
+                        <span className="text-success">Melhor compra: dia {(cartao.diaFechamento % 31) + 1}</span>
+                      </>
+                    )}
+                    {itensMes.length > 0 && overdue && <span className="pill pill-danger">EM ATRASO</span>}
+                    {itensMes.length > 0 && faturaPaga && <span className="pill pill-success">PAGA</span>}
                   </div>
                   <div className="text-right">
                     <div className="text-xs text-zinc-500 uppercase tracking-wider">Total da fatura</div>
@@ -350,7 +365,7 @@ function CartaoModal({
   onSave: (c: Omit<Cartao, "id">) => void;
 }) {
   const empty: Omit<Cartao, "id"> = {
-    nome: "", banco: "", bandeira: "Visa", cor: "#0F0F0F", limite: 0, diaVencimento: 10,
+    nome: "", banco: "", bandeira: "Visa", cor: "#0F0F0F", limite: 0, diaVencimento: 10, diaFechamento: undefined,
   };
   const [f, setF] = useState<Omit<Cartao, "id">>(empty);
 
@@ -385,8 +400,35 @@ function CartaoModal({
           </div>
           <div>
             <label className="label">Dia de vencimento</label>
-            <input type="number" min={1} max={31} className="input" required value={f.diaVencimento} onChange={(e) => setF({ ...f, diaVencimento: parseInt(e.target.value) || 1 })} />
+            <select
+              className="select"
+              required
+              value={f.diaVencimento}
+              onChange={(e) => setF({ ...f, diaVencimento: parseInt(e.target.value) })}
+            >
+              {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </select>
           </div>
+          <div>
+            <label className="label">Dia de fechamento</label>
+            <select
+              className="select"
+              value={f.diaFechamento ?? ""}
+              onChange={(e) => setF({ ...f, diaFechamento: e.target.value ? parseInt(e.target.value) : undefined })}
+            >
+              <option value="">—</option>
+              {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </select>
+          </div>
+          {f.diaFechamento && (
+            <div className="col-span-2 -mt-2 text-xs text-zinc-500">
+              Melhor dia para compra: <span className="text-success font-medium">dia {((f.diaFechamento % 31) + 1)}</span> — compras feitas a partir desse dia caem na próxima fatura.
+            </div>
+          )}
           <div className="col-span-2">
             <label className="label">Cor do cartão</label>
             <input type="color" className="input !p-1 h-10" value={f.cor} onChange={(e) => setF({ ...f, cor: e.target.value })} />

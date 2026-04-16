@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, handleError, pick } from '@/lib/api-helpers'
 
-const ALLOWED_FIELDS = ['nome', 'banco', 'bandeira', 'cor', 'limite', 'diaVencimento', 'faturaPagaMes', 'isDefault', 'ordem']
+const ALLOWED_FIELDS = ['nome', 'banco', 'bandeira', 'cor', 'limite', 'diaVencimento', 'diaFechamento', 'faturaPagaMes', 'isDefault', 'ordem']
 
 export async function GET() {
   try {

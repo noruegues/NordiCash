@@ -8,6 +8,7 @@ import LineProjecao from "@/components/charts/LineProjecao";
 import PieCategoria from "@/components/charts/PieCategoria";
 import { useStore, type Investimento } from "@/lib/store";
 import MoneyInput from "@/components/ui/MoneyInput";
+import NumberInput from "@/components/ui/NumberInput";
 import { projecaoInvestimento, projecaoPortfolio } from "@/lib/calculations";
 import { brl, dataBR } from "@/lib/format";
 import { LineChart, Plus, Pencil, Trash2, RefreshCw, Info } from "lucide-react";
@@ -133,7 +134,7 @@ export default function InvestimentosPage() {
             {benchmark === "custom" ? (
               <div>
                 <label className="label">Taxa a.a. (%)</label>
-                <input type="number" step="0.1" className="input" value={taxaCustomAA} onChange={(e) => setTaxaCustomAA(parseFloat(e.target.value) || 0)} />
+                <NumberInput decimal value={taxaCustomAA} onChange={(v) => setTaxaCustomAA(v ?? 0)} />
               </div>
             ) : (
               <div>
@@ -277,7 +278,7 @@ function InvModal({
           </div>
           <div>
             <label className="label">Taxa esperada (% mês)</label>
-            <input type="number" step="0.01" className="input" value={f.taxaMensal ?? 0} onChange={(e) => setF({ ...f, taxaMensal: parseFloat(e.target.value) || 0 })} />
+            <NumberInput decimal value={f.taxaMensal ?? 0} onChange={(v) => setF({ ...f, taxaMensal: v ?? 0 })} />
           </div>
         </div>
         <div className="flex gap-2 justify-end pt-2">

@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { useStore } from "@/lib/store";
 import { ArrowLeft, ArrowRight, Plus, Trash2 } from "lucide-react";
+import NumberInput from "@/components/ui/NumberInput";
 
 type Step = "conta" | "contas-bancarias" | "cartoes" | "fim";
 
@@ -215,7 +216,7 @@ function CartaoInline({ onAdd }: { onAdd: (c: { nome: string; banco: string; lim
       <input className="input" placeholder="Apelido" value={nome} onChange={(e) => setNome(e.target.value)} />
       <input className="input" placeholder="Banco" value={banco} onChange={(e) => setBanco(e.target.value)} />
       <input type="number" className="input" placeholder="Limite" value={limite || ""} onChange={(e) => setLimite(parseFloat(e.target.value) || 0)} />
-      <input type="number" min={1} max={31} className="input" placeholder="Dia de vencimento" value={dia} onChange={(e) => setDia(parseInt(e.target.value) || 1)} />
+      <NumberInput min={1} max={31} placeholder="Dia de vencimento" value={dia} onChange={(v) => setDia(v ?? 1)} />
       <input type="color" className="input !p-1 h-9" value={cor} onChange={(e) => setCor(e.target.value)} />
       <div className="flex gap-2">
         <button className="btn btn-ghost btn-sm flex-1" onClick={() => setShow(false)}>Cancelar</button>

@@ -3,11 +3,12 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import PageHeader from "@/components/ui/PageHeader";
 import Modal from "@/components/ui/Modal";
-import { useStore, gerarParcelas, type Consorcio, type StatusParcela } from "@/lib/store";
+import { useStore, gerarParcelas, type Consorcio } from "@/lib/store";
 import { consorcioStats } from "@/lib/calculations";
 import { brl, dataBR } from "@/lib/format";
 import { Plus, Pencil, Trash2, Check, X } from "lucide-react";
 import MoneyInput from "@/components/ui/MoneyInput";
+import NumberInput from "@/components/ui/NumberInput";
 
 export default function ConsorciosPage() {
   const { consorcios, contas, addConsorcio, updateConsorcio, removeConsorcio, updateParcela, marcarContemplado, desmarcarContempladosTodos } = useStore();
@@ -47,7 +48,7 @@ export default function ConsorciosPage() {
                 </div>
               }
             >
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
                 <Stat label="Crédito" value={brl(c.valorCarta)} />
                 <Stat label="Taxa adm." value={`${c.taxaAdmin}%`} />
                 <Stat
@@ -59,6 +60,7 @@ export default function ConsorciosPage() {
                   value={brl(stats.parcelaCheiaSimulada)}
                 />
                 <Stat label="Pagas" value={`${stats.pagas}/${c.prazoMeses}`} />
+                <Stat label="Total pago" value={brl(stats.totalPago)} />
                 <Stat label="Saldo dev." value={brl(stats.saldoDevedor)} />
                 <Stat label="% quitado" value={`${stats.pct.toFixed(1)}%`} />
               </div>
@@ -83,14 +85,15 @@ export default function ConsorciosPage() {
               {isOpen && (
                 <div className="mt-5 overflow-x-auto max-h-96">
                   <table className="t">
-                    <thead><tr><th>Nº</th><th>Vencimento</th><th className="text-right">Valor pago</th><th className="text-right">Cheia simulada</th><th>Status</th><th>Contemplado</th></tr></thead>
+                    <thead><tr><th>Nº</th><th>Vencimento</th><th className="text-right">Valor pago</th><th className="text-right">Cheia simulada</th><th className="text-center">Paga</th><th>Contemplado</th></tr></thead>
                     <tbody>
                       {c.parcelas.map((p, idx) => {
                         const cheiaSim = stats.cheias[idx] ?? 0;
+                        const isPaga = p.status === "Pago";
                         return (
-                        <tr key={p.numero}>
-                          <td className="text-zinc-500">#{p.numero}</td>
-                          <td>{dataBR(p.dataVenc)}</td>
+                        <tr key={p.numero} className={isPaga ? "bg-success/5" : ""}>
+                          <td className={isPaga ? "text-zinc-400" : "text-zinc-500"}>#{p.numero}</td>
+                          <td className={isPaga ? "text-zinc-400" : ""}>{dataBR(p.dataVenc)}</td>
                           <td className="text-right">
                             <ValorPagoCell
                               value={p.valor}
@@ -98,14 +101,12 @@ export default function ConsorciosPage() {
                             />
                           </td>
                           <td className="text-right text-zinc-400">{brl(cheiaSim)}</td>
-                          <td>
-                            <select
-                              className="select !h-7 !text-xs"
-                              value={p.status}
-                              onChange={(e) => updateParcela(c.id, p.numero, { status: e.target.value as StatusParcela })}
-                            >
-                              <option>Futuro</option><option>Pendente</option><option>Pago</option>
-                            </select>
+                          <td className="text-center">
+                            <input
+                              type="checkbox"
+                              checked={isPaga}
+                              onChange={(e) => updateParcela(c.id, p.numero, { status: e.target.checked ? "Pago" : "Pendente" })}
+                            />
                           </td>
                           <td>
                             <label className="inline-flex items-center gap-2 text-xs">
@@ -255,7 +256,33 @@ function ConsorcioModal({
         e.preventDefault();
         // grava a taxa calculada automaticamente
         const base = { ...f, taxaAdmin: Number(taxaAdminCalc.toFixed(2)) };
-        onSave({ ...base, parcelas: gerarParcelas(base) });
+        // Na edição regenera parcelas com o novo prazo/valores, mas preserva
+        // parcelas já pagas (por número) — mantém valor e status original.
+        // Parcelas não pagas recebem valor = saldo restante / qtd não pagas,
+        // garantindo que pagar tudo zera o saldo devedor.
+        if (editing) {
+          const novas = gerarParcelas(base);
+          const mescladas = novas.map((np) => {
+            const antiga = editing.parcelas.find((op) => op.numero === np.numero);
+            if (antiga && (antiga.paga || antiga.status === "Pago")) {
+              return { ...np, valor: antiga.valor, paga: true, status: "Pago" as const, contemplado: antiga.contemplado };
+            }
+            return np;
+          });
+          const totalDevido = base.valorCarta * (1 + Number(taxaAdminCalc.toFixed(2)) / 100);
+          const totalPago = mescladas.filter((p) => p.status === "Pago").reduce((s, p) => s + p.valor, 0);
+          const naoPagasCount = mescladas.filter((p) => p.status !== "Pago").length;
+          const saldoRestante = Math.max(0, totalDevido - totalPago);
+          const cheiaNaoPaga = naoPagasCount > 0 ? saldoRestante / naoPagasCount : 0;
+          // Enquanto não contemplado, aplica a redução (ex: 50%) sobre o valor cheio.
+          // Quando contemplado, usa valor cheio (pagar tudo = saldo zero).
+          const reducao = base.contemplado || base.pagamentoReduzido === false ? 1 : (base.percentualReducao ?? 0.5);
+          const valorNaoPaga = Math.round(cheiaNaoPaga * reducao * 100) / 100;
+          const final = mescladas.map((p) => (p.status === "Pago" ? p : { ...p, valor: valorNaoPaga }));
+          onSave({ ...base, parcelas: final });
+        } else {
+          onSave({ ...base, parcelas: gerarParcelas(base) });
+        }
       }}>
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -272,7 +299,7 @@ function ConsorcioModal({
           </div>
           <div>
             <label className="label">Prazo (meses)</label>
-            <input type="number" className="input" required value={f.prazoMeses || ""} onChange={(e) => setF({ ...f, prazoMeses: parseInt(e.target.value) || 0 })} />
+            <NumberInput required min={1} value={f.prazoMeses || undefined} onChange={(v) => setF({ ...f, prazoMeses: v ?? 0 })} />
           </div>
           <div>
             <label className="label">Parcela cheia</label>
@@ -291,7 +318,7 @@ function ConsorcioModal({
           </div>
           <div>
             <label className="label">Dia de vencimento</label>
-            <input type="number" min={1} max={31} className="input" required value={f.diaVencimento} onChange={(e) => setF({ ...f, diaVencimento: parseInt(e.target.value) || 1 })} />
+            <NumberInput required min={1} max={31} value={f.diaVencimento} onChange={(v) => setF({ ...f, diaVencimento: v ?? 1 })} />
           </div>
           <div className="col-span-2">
             <label className="flex items-center gap-2 text-sm text-zinc-300">

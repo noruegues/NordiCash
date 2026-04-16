@@ -52,6 +52,7 @@ export type Cartao = {
   cor: string;
   limite: number;
   diaVencimento: number;
+  diaFechamento?: number;
   faturaPagaMes?: string;
   isDefault?: boolean;
   ordem?: number;

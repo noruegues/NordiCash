@@ -1,11 +1,24 @@
 import type { Investimento, Consorcio, Bem } from "./store";
 
 export function projecaoInvestimento(inv: Investimento, taxaMensal: number, meses: number) {
-  const data: { mes: number; valor: number }[] = [];
-  let saldo = inv.saldoAtual;
+  // Retorna 3 séries: saldo projetado, aporte acumulado, rendimento acumulado
+  const data: { mes: number; saldo: number; aporteAcum: number; rendimentoAcum: number; valor: number }[] = [];
+  const saldoBase = inv.saldoAtual;
+  let saldo = saldoBase;
+  let aporteAcum = 0;
   for (let m = 0; m <= meses; m++) {
-    if (m > 0) saldo = (saldo + inv.aporteMensal) * (1 + taxaMensal);
-    data.push({ mes: m, valor: Math.round(saldo) });
+    if (m > 0) {
+      saldo = (saldo + inv.aporteMensal) * (1 + taxaMensal);
+      aporteAcum += inv.aporteMensal;
+    }
+    const rendimentoAcum = saldo - saldoBase - aporteAcum;
+    data.push({
+      mes: m,
+      saldo: Math.round(saldo),
+      aporteAcum: Math.round(saldoBase + aporteAcum),
+      rendimentoAcum: Math.round(rendimentoAcum),
+      valor: Math.round(saldo),
+    });
   }
   return data;
 }
