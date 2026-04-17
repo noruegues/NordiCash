@@ -32,6 +32,7 @@ export default function Dashboard() {
   const { receitas, despesas, investimentos } = useStore();
   const [periodo, setPeriodo] = useState<Periodo>("todos");
   const [custom, setCustom] = useState({ from: "", to: "" });
+  const [incluirEmprestados, setIncluirEmprestados] = useState(false);
 
   // Até o mês atual (inclusive). Valores projetados em meses futuros não entram no realizado:
   // - Receitas: só as já recebidas (mesRef <= mês atual)
@@ -40,18 +41,21 @@ export default function Dashboard() {
   const mesAtual = new Date().toISOString().slice(0, 7);
 
   const recF = useMemo(
-    () => receitas.filter((r) => r.mesRef <= mesAtual && inPeriodo(r.mesRef, periodo, custom)),
-    [receitas, periodo, custom, mesAtual]
+    () => receitas.filter((r) => {
+      if (!incluirEmprestados && r.emprestado) return false;
+      return r.mesRef <= mesAtual && inPeriodo(r.mesRef, periodo, custom);
+    }),
+    [receitas, periodo, custom, mesAtual, incluirEmprestados]
   );
   const desF = useMemo(
     () => despesas.filter((d) => {
+      if (!incluirEmprestados && d.emprestado) return false;
       const dentroPeriodo = inPeriodo(d.mesRef, periodo, custom);
       if (!dentroPeriodo) return false;
-      // cartão: sempre conta; outras formas: só até hoje
       if (d.cartaoId) return true;
       return d.mesRef <= mesAtual;
     }),
-    [despesas, periodo, custom, mesAtual]
+    [despesas, periodo, custom, mesAtual, incluirEmprestados]
   );
 
   const totalReceita = recF.reduce((s, r) => s + r.valor, 0);
@@ -122,19 +126,29 @@ export default function Dashboard() {
 
   // Fluxo agregado por mês — usa TODAS as receitas/despesas (incluindo futuras) filtradas só pelo período
   const allRecPeriodo = useMemo(
-    () => receitas.filter((r) => inPeriodo(r.mesRef, periodo, custom)),
-    [receitas, periodo, custom]
+    () => receitas.filter((r) => {
+      if (!incluirEmprestados && r.emprestado) return false;
+      return inPeriodo(r.mesRef, periodo, custom);
+    }),
+    [receitas, periodo, custom, incluirEmprestados]
   );
   const allDesPeriodo = useMemo(
-    () => despesas.filter((d) => inPeriodo(d.mesRef, periodo, custom)),
-    [despesas, periodo, custom]
+    () => despesas.filter((d) => {
+      if (!incluirEmprestados && d.emprestado) return false;
+      return inPeriodo(d.mesRef, periodo, custom);
+    }),
+    [despesas, periodo, custom, incluirEmprestados]
   );
-  const emptyFluxo = () => ({ receitaRecebida: 0, receitaProv: 0, despesaPaga: 0, despesaProv: 0 });
+  const emptyFluxo = () => ({ receitaRecebida: 0, receitaEmprestimo: 0, receitaProv: 0, despesaPaga: 0, despesaProv: 0 });
   const fluxoMap = new Map<string, ReturnType<typeof emptyFluxo>>();
   allRecPeriodo.forEach((r) => {
     const cur = fluxoMap.get(r.mesRef) || emptyFluxo();
-    if (r.mesRef <= mesAtual) cur.receitaRecebida += r.valor;
-    else cur.receitaProv += r.valor;
+    if (r.mesRef <= mesAtual) {
+      if (r.emprestado) cur.receitaEmprestimo += r.valor;
+      else cur.receitaRecebida += r.valor;
+    } else {
+      cur.receitaProv += r.valor;
+    }
     fluxoMap.set(r.mesRef, cur);
   });
   allDesPeriodo.forEach((d) => {
@@ -199,7 +213,23 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card title="Fluxo mensal" className="lg:col-span-2">
+        <Card
+          title={
+            <div className="flex items-center gap-3">
+              <span>Fluxo mensal</span>
+              <label className={`flex items-center gap-1.5 text-xs cursor-pointer select-none px-2 py-1 rounded transition ${incluirEmprestados ? "text-loan" : "text-zinc-500"}`}>
+                <input
+                  type="checkbox"
+                  checked={incluirEmprestados}
+                  onChange={(e) => setIncluirEmprestados(e.target.checked)}
+                  className="accent-loan"
+                />
+                Visualizar dados com valores emprestado
+              </label>
+            </div>
+          }
+          className="lg:col-span-2"
+        >
           {fluxo.length ? <AreaFlow data={fluxo} /> : <Empty />}
         </Card>
         <Card title="Despesas por categoria">

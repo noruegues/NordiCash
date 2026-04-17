@@ -10,6 +10,7 @@ import { BarChart3, LineChart } from "lucide-react";
 type FluxoItem = {
   mes: string;
   receitaRecebida: number;
+  receitaEmprestimo: number;
   receitaProv: number;
   despesaPaga: number;
   despesaProv: number;
@@ -20,6 +21,7 @@ const STORAGE_KEY = "nordicash-fluxo-chart-type";
 
 const COLORS = {
   receitaRecebida: "#22C55E",
+  receitaEmprestimo: "#86EFAC",
   receitaProv: "#3B82F6",
   despesaPaga: "#EF4444",
   despesaProv: "#F59E0B",
@@ -80,6 +82,7 @@ export default function AreaFlow({ data }: { data: FluxoItem[] }) {
             <Tooltip {...tooltipStyle} formatter={(v: number) => brl(v)} />
             <Legend wrapperStyle={legendStyle} iconType="square" />
             <Bar dataKey="receitaRecebida" name="Receita recebida" stackId="receita" fill={COLORS.receitaRecebida} radius={[0, 0, 0, 0]} />
+            <Bar dataKey="receitaEmprestimo" name="Recebimento empréstimo" stackId="receita" fill={COLORS.receitaEmprestimo} radius={[0, 0, 0, 0]} />
             <Bar dataKey="receitaProv" name="Receita provisionada" stackId="receita" fill={COLORS.receitaProv} radius={[3, 3, 0, 0]} />
             <Bar dataKey="despesaPaga" name="Despesa paga" stackId="despesa" fill={COLORS.despesaPaga} radius={[0, 0, 0, 0]} />
             <Bar dataKey="despesaProv" name="Despesa provisionada" stackId="despesa" fill={COLORS.despesaProv} radius={[3, 3, 0, 0]} />
@@ -100,6 +103,7 @@ export default function AreaFlow({ data }: { data: FluxoItem[] }) {
             <Tooltip {...tooltipStyle} formatter={(v: number) => brl(v)} />
             <Legend wrapperStyle={legendStyle} iconType="circle" />
             <Area type="monotone" dataKey="receitaRecebida" name="Receita recebida" stroke={COLORS.receitaRecebida} strokeWidth={2.5} fill={`url(#g-receitaRecebida)`} />
+            <Area type="monotone" dataKey="receitaEmprestimo" name="Recebimento empréstimo" stroke={COLORS.receitaEmprestimo} strokeWidth={2.5} fill={`url(#g-receitaEmprestimo)`} />
             <Area type="monotone" dataKey="receitaProv" name="Receita provisionada" stroke={COLORS.receitaProv} strokeWidth={2.5} fill={`url(#g-receitaProv)`} />
             <Area type="monotone" dataKey="despesaPaga" name="Despesa paga" stroke={COLORS.despesaPaga} strokeWidth={2.5} fill={`url(#g-despesaPaga)`} />
             <Area type="monotone" dataKey="despesaProv" name="Despesa provisionada" stroke={COLORS.despesaProv} strokeWidth={2.5} fill={`url(#g-despesaProv)`} />

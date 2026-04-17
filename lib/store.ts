@@ -14,6 +14,7 @@ export type ContaBancaria = {
   tipo: "Corrente" | "Poupança" | "Pagamento";
   saldoInicial: number;
   cor: string;
+  isDefault?: boolean;
 };
 
 export type Receita = {
@@ -25,6 +26,7 @@ export type Receita = {
   mesRef: string;
   recorrencia: "Mensal" | "Única";
   groupId?: string;
+  emprestado?: boolean;
 };
 
 export type Despesa = {
@@ -73,6 +75,7 @@ export type ParcelaConsorcio = {
   id?: string;
   numero: number;
   valor: number;
+  cheiaSimulada?: number;
   dataVenc?: string;
   mesRef?: string;
   status?: StatusParcela;
@@ -139,6 +142,7 @@ type State = {
   addConta: (c: Omit<ContaBancaria, "id">) => Promise<void>;
   updateConta: (id: string, c: Partial<ContaBancaria>) => Promise<void>;
   removeConta: (id: string) => Promise<void>;
+  setContaDefault: (id: string) => Promise<void>;
 
   addReceita: (r: Omit<Receita, "id">) => Promise<void>;
   updateReceita: (id: string, r: Partial<Receita>) => Promise<void>;
@@ -156,7 +160,7 @@ type State = {
   removeCartao: (id: string) => Promise<void>;
   setCartaoDefault: (id: string) => Promise<void>;
   reorderCartoes: (ids: string[]) => Promise<void>;
-  marcarFaturaPaga: (id: string, mes: string) => Promise<void>;
+  marcarFaturaPaga: (id: string, mes: string, contaId?: string) => Promise<void>;
   desmarcarFaturaPaga: (id: string, mes: string) => Promise<void>;
 
   addInvestimento: (i: Omit<Investimento, "id">) => Promise<void>;
@@ -210,7 +214,10 @@ export const useStore = create<State>()((set, get) => ({
 
   // Contas
   addConta: async (c) => {
-    const conta = await api<ContaBancaria>("/api/contas", "POST", c);
+    const existentes = get().contas.length;
+    // Primeira conta: auto-favorita
+    const payload = existentes === 0 ? { ...c, isDefault: true } : c;
+    const conta = await api<ContaBancaria>("/api/contas", "POST", payload);
     set((s) => ({ contas: [conta, ...s.contas] }));
   },
   updateConta: async (id, c) => {
@@ -219,7 +226,19 @@ export const useStore = create<State>()((set, get) => ({
   },
   removeConta: async (id) => {
     await api("/api/contas", "DELETE", { id });
-    set((s) => ({ contas: s.contas.filter((x) => x.id !== id) }));
+    const removida = get().contas.find((x) => x.id === id);
+    const restantes = get().contas.filter((x) => x.id !== id);
+    set({ contas: restantes });
+    // Se removeu a favorita e sobrou só uma, favorita automaticamente
+    if (removida?.isDefault && restantes.length === 1) {
+      get().setContaDefault(restantes[0].id);
+    }
+  },
+  setContaDefault: async (id) => {
+    await api("/api/contas", "PATCH", { id, setDefault: true });
+    set((s) => ({
+      contas: s.contas.map((c) => ({ ...c, isDefault: c.id === id })),
+    }));
   },
 
   // Receitas
@@ -290,15 +309,17 @@ export const useStore = create<State>()((set, get) => ({
       }),
     }));
   },
-  marcarFaturaPaga: async (id, mes) => {
+  marcarFaturaPaga: async (id, mes, contaId) => {
     // 1. Marca o cartão
     await api("/api/cartoes", "PATCH", { id, faturaPagaMes: mes });
     set((s) => ({ cartoes: s.cartoes.map((x) => (x.id === id ? { ...x, faturaPagaMes: mes } : x)) }));
-    // 2. Marca todas as despesas desse cartão/mês como pagas
-    await api("/api/despesas", "PATCH", { bulk: true, cartaoId: id, mesRef: mes, data: { pago: true } });
+    // 2. Marca despesas como pagas e (opcionalmente) vincula à conta de débito
+    const data: { pago: boolean; contaId?: string } = { pago: true };
+    if (contaId) data.contaId = contaId;
+    await api("/api/despesas", "PATCH", { bulk: true, cartaoId: id, mesRef: mes, data });
     set((s) => ({
       despesas: s.despesas.map((d) =>
-        d.cartaoId === id && d.mesRef === mes ? { ...d, pago: true } : d
+        d.cartaoId === id && d.mesRef === mes ? { ...d, pago: true, ...(contaId ? { contaId } : {}) } : d
       ),
     }));
   },
@@ -343,7 +364,6 @@ export const useStore = create<State>()((set, get) => ({
     set((s) => ({ consorcios: s.consorcios.filter((x) => x.id !== id) }));
   },
   updateParcela: (consorcioId, numero, p) => {
-    // Se mudou status, sincroniza paga
     const patch = { ...p };
     if (patch.status) {
       patch.paga = patch.status === "Pago";
@@ -351,7 +371,27 @@ export const useStore = create<State>()((set, get) => ({
     set((s) => ({
       consorcios: s.consorcios.map((c) => {
         if (c.id !== consorcioId) return c;
-        return { ...c, parcelas: c.parcelas.map((pp) => (pp.numero === numero ? { ...pp, ...patch } : pp)) };
+        // Aplica o patch na parcela alvo
+        const parcelas = c.parcelas.map((pp) => (pp.numero === numero ? { ...pp, ...patch } : pp));
+
+        // Ao mudar status (pagar/despagar) OU valor: recalcula TODAS as não pagas
+        // com valor flat = saldoDevedor / qtd não pagas × redução
+        if (patch.status !== undefined || patch.valor !== undefined) {
+          const totalDevido = c.valorCarta * (1 + c.taxaAdmin / 100);
+          const reducao = c.contemplado || c.pagamentoReduzido === false ? 1 : (c.percentualReducao ?? 0.5);
+          const paidSum = parcelas.filter((pp) => pp.status === "Pago").reduce((sum, pp) => sum + pp.valor, 0);
+          const saldoDevedor = Math.max(0, totalDevido - paidSum);
+          const unpaidCount = parcelas.filter((pp) => pp.status !== "Pago").length;
+          const cheiaFlat = unpaidCount > 0 ? Math.round((saldoDevedor / unpaidCount) * 100) / 100 : 0;
+          const valorFlat = Math.round(cheiaFlat * reducao * 100) / 100;
+          const recalculated = parcelas.map((pp) => {
+            if (pp.status === "Pago") return pp;
+            return { ...pp, valor: valorFlat, cheiaSimulada: cheiaFlat };
+          });
+          return { ...c, parcelas: recalculated };
+        }
+
+        return { ...c, parcelas };
       }),
     }));
     // Sync to API — status é fonte de verdade para paga
@@ -361,6 +401,7 @@ export const useStore = create<State>()((set, get) => ({
         numero: pp.numero,
         mesRef: pp.mesRef ?? "",
         valor: pp.valor,
+        cheiaSimulada: pp.cheiaSimulada,
         paga: pp.status === "Pago",
       }));
       api("/api/consorcios", "PATCH", { id: consorcioId, parcelas: parcelasApi }).catch(() => {});
@@ -385,17 +426,16 @@ export const useStore = create<State>()((set, get) => ({
         const parcelasRestantes = c.parcelas.filter((p) => p.numero > parcelaNumero).length;
         const parcelaCheia = parcelasRestantes > 0 ? saldoDevedor / parcelasRestantes : 0;
 
+        const cheiaFlat = Math.round(parcelaCheia * 100) / 100;
         const newParcelas = c.parcelas.map((p) => {
           if (p.numero < parcelaNumero) {
-            // Anteriores: marcar como pagas
             return { ...p, status: "Pago" as const, paga: true };
           }
           if (p.numero === parcelaNumero) {
-            // A parcela contemplada: marcar como paga e contemplada
             return { ...p, status: "Pago" as const, paga: true, contemplado: true };
           }
-          // Futuras: marcar como contemplado + recalcular valor (parcela cheia)
-          return { ...p, contemplado: true, valor: Math.round(parcelaCheia * 100) / 100 };
+          // Contemplado: valor = cheia (sem redução), todas iguais (flat)
+          return { ...p, contemplado: true, valor: cheiaFlat, cheiaSimulada: cheiaFlat };
         });
 
         return { ...c, contemplado: true, parcelas: newParcelas };
@@ -409,6 +449,7 @@ export const useStore = create<State>()((set, get) => ({
         numero: pp.numero,
         mesRef: pp.mesRef ?? "",
         valor: pp.valor,
+        cheiaSimulada: pp.cheiaSimulada,
         paga: pp.status === "Pago",
       }));
       api("/api/consorcios", "PATCH", {
@@ -423,18 +464,20 @@ export const useStore = create<State>()((set, get) => ({
     set((s) => ({
       consorcios: s.consorcios.map((c) => {
         if (c.id !== consorcioId) return c;
-        // Recalcula valor com desconto (parcela reduzida)
+        // Ao desmarcar contemplação: recalcula não pagas com modelo flat + redução
+        const totalDevido = c.valorCarta * (1 + c.taxaAdmin / 100);
         const reducao = c.pagamentoReduzido === false ? 1 : (c.percentualReducao ?? 0.5);
-        const valorReduzido = Math.round(c.parcelaCheia * reducao * 100) / 100;
+        const paidSum = c.parcelas.filter((pp) => pp.status === "Pago").reduce((sum, pp) => sum + pp.valor, 0);
+        const saldoDevedor = Math.max(0, totalDevido - paidSum);
+        const unpaidCount = c.parcelas.filter((pp) => pp.status !== "Pago").length;
+        const cheiaFlat = unpaidCount > 0 ? Math.round((saldoDevedor / unpaidCount) * 100) / 100 : 0;
+        const valorFlat = Math.round(cheiaFlat * reducao * 100) / 100;
         return {
           ...c,
           contemplado: false,
           parcelas: c.parcelas.map((p) => {
-            // Parcelas que estavam contempladas e não foram pagas: voltam ao valor reduzido
-            if (p.contemplado && p.status !== "Pago") {
-              return { ...p, contemplado: false, valor: valorReduzido };
-            }
-            return { ...p, contemplado: false };
+            if (p.status === "Pago") return { ...p, contemplado: false };
+            return { ...p, contemplado: false, valor: valorFlat, cheiaSimulada: cheiaFlat };
           }),
         };
       }),
@@ -445,6 +488,7 @@ export const useStore = create<State>()((set, get) => ({
         numero: pp.numero,
         mesRef: pp.mesRef ?? "",
         valor: pp.valor,
+        cheiaSimulada: pp.cheiaSimulada,
         paga: pp.status === "Pago",
       }));
       api("/api/consorcios", "PATCH", { id: consorcioId, contemplado: false, parcelas: parcelasApi }).catch(() => {});

@@ -27,11 +27,12 @@ export async function PATCH(req: Request) {
     const session = await requireAuth()
     const body = await req.json()
 
-    // Bulk update: { bulk: true, cartaoId, mesRef, data: { pago: true } }
+    // Bulk update: { bulk: true, cartaoId, mesRef, data: { pago: true, contaId? } }
     if (body.bulk && body.cartaoId && body.mesRef) {
+      const safeData = pick(body.data ?? {}, ALLOWED_FIELDS)
       await prisma.despesa.updateMany({
         where: { userId: session.userId, cartaoId: body.cartaoId, mesRef: body.mesRef },
-        data: body.data,
+        data: safeData,
       })
       return NextResponse.json({ ok: true })
     }

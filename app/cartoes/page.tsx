@@ -1,11 +1,12 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import PageHeader from "@/components/ui/PageHeader";
 import Modal from "@/components/ui/Modal";
 import CreditCardVisual from "@/components/cards/CreditCardVisual";
 import ProgressBar from "@/components/ui/ProgressBar";
-import { useStore, type Cartao, type Bandeira, usoCartao } from "@/lib/store";
+import { useStore, type Cartao, type Bandeira, type ContaBancaria, usoCartao } from "@/lib/store";
 import { brl, dataBR, mesRefBR } from "@/lib/format";
 import { Plus, Pencil, Trash2, AlertTriangle, CheckCircle2, Undo2, Star, GripVertical, ChevronLeft, ChevronRight } from "lucide-react";
 import UpgradeModal from "@/components/UpgradeModal";
@@ -16,12 +17,14 @@ import ExportButton from "@/components/ui/ExportButton";
 import { exportPDF, exportExcel } from "@/lib/export";
 
 export default function CartoesPage() {
-  const { cartoes, despesas, addCartao, updateCartao, removeCartao, setCartaoDefault, reorderCartoes, marcarFaturaPaga, desmarcarFaturaPaga } = useStore();
+  const { cartoes, contas, despesas, addCartao, updateCartao, removeCartao, setCartaoDefault, reorderCartoes, marcarFaturaPaga, desmarcarFaturaPaga } = useStore();
   const user = useCurrentUser();
   const [selected, setSelected] = useState<string | null>(cartoes[0]?.id ?? null);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Cartao | null>(null);
   const [upgrade, setUpgrade] = useState(false);
+  const [payDialog, setPayDialog] = useState<{ cartaoId: string; mes: string; valor: number } | null>(null);
+  const [noContaDialog, setNoContaDialog] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState<number | null>(null);
   const dragNode = useRef<HTMLDivElement | null>(null);
@@ -282,7 +285,17 @@ export default function CartoesPage() {
                       ) : (
                         <button
                           className={`btn btn-sm ${overdue ? "btn-danger" : "btn-success"}`}
-                          onClick={() => marcarFaturaPaga(cartao.id, mesFatura)}
+                          onClick={() => {
+                            if (contas.length === 0) {
+                              setNoContaDialog(true);
+                              return;
+                            }
+                            if (contas.length === 1) {
+                              marcarFaturaPaga(cartao.id, mesFatura, contas[0].id);
+                              return;
+                            }
+                            setPayDialog({ cartaoId: cartao.id, mes: mesFatura, valor: totalMesAberto });
+                          }}
                         >
                           <CheckCircle2 size={14} /> Marcar fatura paga
                         </button>
@@ -354,7 +367,83 @@ export default function CartoesPage() {
         onClose={() => setUpgrade(false)}
         reason={`Seu plano ${user?.plano} permite no máximo ${limit} cartões. Faça upgrade para adicionar mais.`}
       />
+
+      <PagarFaturaDialog
+        data={payDialog}
+        contas={contas}
+        onCancel={() => setPayDialog(null)}
+        onConfirm={(contaId) => {
+          if (payDialog) marcarFaturaPaga(payDialog.cartaoId, payDialog.mes, contaId);
+          setPayDialog(null);
+        }}
+      />
+
+      <SemContaDialog
+        open={noContaDialog}
+        onClose={() => setNoContaDialog(false)}
+      />
     </div>
+  );
+}
+
+function PagarFaturaDialog({
+  data, contas, onCancel, onConfirm,
+}: {
+  data: { cartaoId: string; mes: string; valor: number } | null;
+  contas: ContaBancaria[];
+  onCancel: () => void;
+  onConfirm: (contaId: string) => void;
+}) {
+  const defaultConta = contas.find((c) => c.isDefault) ?? contas[0];
+  const [contaId, setContaId] = useState(defaultConta?.id ?? "");
+
+  useEffect(() => {
+    if (data) setContaId(defaultConta?.id ?? "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
+
+  return (
+    <Modal open={!!data} onClose={onCancel} title="Pagar fatura">
+      <div className="space-y-4">
+        <div className="text-sm text-zinc-400">
+          Pagando fatura de <span className="font-semibold text-zinc-100">{data ? mesRefBR(data.mes) : ""}</span> no valor de <span className="font-semibold text-success">{data ? brl(data.valor) : ""}</span>.
+        </div>
+        <div>
+          <label className="label">Conta de débito</label>
+          <select className="select" value={contaId} onChange={(e) => setContaId(e.target.value)}>
+            {contas.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.isDefault ? "★ " : ""}{c.nome} · {c.banco}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex gap-2 justify-end pt-2">
+          <button type="button" className="btn btn-ghost" onClick={onCancel}>Cancelar</button>
+          <button type="button" className="btn btn-success" disabled={!contaId} onClick={() => onConfirm(contaId)}>
+            <CheckCircle2 size={14} /> Pagar fatura
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function SemContaDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  return (
+    <Modal open={open} onClose={onClose} title="Sem conta cadastrada">
+      <div className="space-y-4">
+        <div className="text-sm text-zinc-400">
+          Para pagar a fatura, você precisa ter pelo menos uma conta bancária cadastrada. O valor será debitado dela.
+        </div>
+        <div className="flex gap-2 justify-end pt-2">
+          <button type="button" className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+          <Link href="/contas" className="btn btn-primary" onClick={onClose}>
+            <Plus size={14} /> Criar conta
+          </Link>
+        </div>
+      </div>
+    </Modal>
   );
 }
 

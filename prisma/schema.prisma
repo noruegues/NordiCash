@@ -43,6 +43,7 @@ model ContaBancaria {
   tipo        String   @default("Corrente")
   saldoInicial Float   @default(0) @map("saldo_inicial")
   cor         String   @default("#6366f1")
+  isDefault   Boolean  @default(false) @map("is_default")
   createdAt   DateTime @default(now()) @map("created_at")
 
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -62,6 +63,7 @@ model Receita {
   mesRef      String   @map("mes_ref")
   recorrencia String   @default("Única")
   groupId     String?  @map("group_id")
+  emprestado  Boolean  @default(false)
   createdAt   DateTime @default(now()) @map("created_at")
 
   user  User           @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -158,13 +160,14 @@ model Consorcio {
 }
 
 model ParcelaConsorcio {
-  id          String   @id @default(uuid())
-  consorcioId String   @map("consorcio_id")
-  numero      Int
-  mesRef      String   @map("mes_ref")
-  valor       Float
-  paga        Boolean  @default(false)
-  createdAt   DateTime @default(now()) @map("created_at")
+  id              String   @id @default(uuid())
+  consorcioId     String   @map("consorcio_id")
+  numero          Int
+  mesRef          String   @map("mes_ref")
+  valor           Float
+  cheiaSimulada   Float?   @map("cheia_simulada")
+  paga            Boolean  @default(false)
+  createdAt       DateTime @default(now()) @map("created_at")
 
   consorcio Consorcio @relation(fields: [consorcioId], references: [id], onDelete: Cascade)
 

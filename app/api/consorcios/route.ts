@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { requireAuth, handleError, pick } from '@/lib/api-helpers'
 
 const ALLOWED_FIELDS = ['bem', 'administradora', 'valorCarta', 'prazoMeses', 'parcelaCheia', 'taxaAdmin', 'inicio', 'diaVencimento', 'debitoAutomatico', 'contaId', 'contemplado', 'pagamentoReduzido', 'percentualReducao']
-const PARCELA_FIELDS = ['numero', 'mesRef', 'valor', 'paga']
+const PARCELA_FIELDS = ['numero', 'mesRef', 'valor', 'cheiaSimulada', 'paga']
 
 export async function GET() {
   try {

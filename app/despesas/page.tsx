@@ -5,7 +5,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import Modal from "@/components/ui/Modal";
 import { useStore, type Despesa, type ContaBancaria, type Cartao, type FormaPagamento, type RecorrenciaTipo } from "@/lib/store";
 import { brl, mesRefBR } from "@/lib/format";
-import { Plus, Pencil, Trash2, Check, CheckCheck, AlertTriangle, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Plus, Pencil, Trash2, Check, CheckCheck, AlertTriangle, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, Info } from "lucide-react";
 import MacroView from "@/components/MacroView";
 import MoneyInput from "@/components/ui/MoneyInput";
 import MonthFilter, { applyMonthFilter, type MonthFilterValue } from "@/components/ui/MonthFilter";
@@ -198,12 +198,12 @@ export default function DespesasPage() {
           }
           className="lg:col-span-2"
           action={
-            filtered.length > 0 && filtered.some((d) => !d.pago) ? (
+            filtered.length > 0 && filtered.some((d) => !d.pago && !d.cartaoId) ? (
               <button
                 className="btn btn-sm btn-soft"
                 onClick={() => {
-                  if (!confirm("Deseja marcar todas as despesas deste mês como paga?")) return;
-                  filtered.filter((d) => !d.pago).forEach((d) => updateDespesa(d.id, { pago: true }));
+                  if (!confirm("Deseja marcar todas as despesas deste mês (exceto cartão) como paga?")) return;
+                  filtered.filter((d) => !d.pago && !d.cartaoId).forEach((d) => updateDespesa(d.id, { pago: true }));
                 }}
               >
                 <CheckCheck size={14} /> Marcar todos como pago
@@ -254,7 +254,14 @@ export default function DespesasPage() {
                 sorted.push({ ...d, _groupIdx: gi });
               }
             }
+            const temCartao = filtered.some((d) => d.cartaoId);
             return (
+            <>
+            {temCartao && (
+              <div className="text-[11px] text-warn/80 mb-2 flex items-center gap-1.5">
+                <Info size={11} /> Despesas de cartão de crédito são quitadas automaticamente ao pagar a fatura na aba Cartões.
+              </div>
+            )}
             <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
             <table className="t min-w-[720px]">
               <thead><tr>
@@ -274,17 +281,35 @@ export default function DespesasPage() {
                   <tr key={d.id} className={`${d.emprestado ? "bg-loan/5" : ""} ${d.pago ? "opacity-60" : ""}`} style={isAlt ? { backgroundColor: "var(--color-surface-alt)" } : undefined}>
 
                     <td>
-                      <button
-                        className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${
-                          d.pago
-                            ? "bg-success/20 border-success text-success"
-                            : "border-zinc-600 hover:border-zinc-400 text-transparent hover:text-zinc-500"
-                        }`}
-                        onClick={() => updateDespesa(d.id, { pago: !d.pago })}
-                        title={d.pago ? "Marcar como não pago" : "Marcar como pago"}
-                      >
-                        <Check size={12} strokeWidth={3} />
-                      </button>
+                      {d.cartaoId ? (
+                        <span className="relative group/tt inline-block">
+                          <button
+                            className={`w-5 h-5 rounded border flex items-center justify-center transition-colors cursor-not-allowed ${
+                              d.pago
+                                ? "bg-success/20 border-success text-success"
+                                : "border-zinc-700 text-transparent"
+                            }`}
+                            disabled
+                          >
+                            <Check size={12} strokeWidth={3} />
+                          </button>
+                          <span className="pointer-events-none absolute left-7 top-1/2 -translate-y-1/2 z-20 whitespace-nowrap rounded bg-zinc-900 border border-warn/40 text-warn text-[11px] px-2 py-1 opacity-0 group-hover/tt:opacity-100 transition-opacity shadow-lg">
+                            Pago apenas via fatura na aba Cartões
+                          </span>
+                        </span>
+                      ) : (
+                        <button
+                          className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${
+                            d.pago
+                              ? "bg-success/20 border-success text-success"
+                              : "border-zinc-600 hover:border-zinc-400 text-transparent hover:text-zinc-500"
+                          }`}
+                          onClick={() => updateDespesa(d.id, { pago: !d.pago })}
+                          title={d.pago ? "Marcar como não pago" : "Marcar como pago"}
+                        >
+                          <Check size={12} strokeWidth={3} />
+                        </button>
+                      )}
                     </td>
                     <td className="font-medium">{d.descricao}</td>
                     <td><span className="pill pill-muted">{d.categoria}</span></td>
@@ -304,6 +329,7 @@ export default function DespesasPage() {
               </tbody>
             </table>
             </div>
+            </>
             );
           })()}
         </Card>
@@ -413,6 +439,21 @@ function DespesaModal({
   const { despesas: allDesp } = useStore();
   const categoriasExistentes = Array.from(new Set(allDesp.map((d) => d.categoria).filter(Boolean))).sort();
 
+  function calcMesRef(data: string, cartaoId?: string): string {
+    let mesRef = data.slice(0, 7);
+    if (cartaoId) {
+      const cartaoSel = cartoes.find((c) => c.id === cartaoId);
+      if (cartaoSel?.diaFechamento) {
+        const diaCompra = parseInt(data.slice(8, 10));
+        const melhorDia = (cartaoSel.diaFechamento % 31) + 1;
+        if (diaCompra >= melhorDia) {
+          mesRef = nextMonth(mesRef, 1);
+        }
+      }
+    }
+    return mesRef;
+  }
+
   const formas: FormaPagamento[] = ["Pix", "Débito", "Dinheiro", "Boleto", "Cartão"];
   const recs: RecorrenciaTipo[] = ["Única", "Recorrente", "Indeterminada"];
   const isCartao = f.forma === "Cartão";
@@ -472,15 +513,6 @@ function DespesaModal({
             <MoneyInput required value={f.valor} onChange={(v) => setF({ ...f, valor: v })} />
           </div>
           <div>
-            <label className="label">Data</label>
-            <input type="date" className="input" required value={f.data} onChange={(e) => setF({ ...f, data: e.target.value, mesRef: e.target.value.slice(0, 7) })} />
-          </div>
-          <div>
-            <label className="label">Mês de referência</label>
-            <input type="month" className="input" required value={f.mesRef} onChange={(e) => setF({ ...f, mesRef: e.target.value })} />
-          </div>
-
-          <div>
             <label className="label">Forma de pagamento</label>
             <select className="select" value={f.forma} onChange={(e) => setF({ ...f, forma: e.target.value as FormaPagamento })}>
               {formas.map((x) => <option key={x}>{x}</option>)}
@@ -489,7 +521,10 @@ function DespesaModal({
           {isCartao ? (
             <div>
               <label className="label">Cartão</label>
-              <select className="select" required value={f.cartaoId ?? ""} onChange={(e) => setF({ ...f, cartaoId: e.target.value })}>
+              <select className="select" required value={f.cartaoId ?? ""} onChange={(e) => {
+                const novoCartaoId = e.target.value;
+                setF({ ...f, cartaoId: novoCartaoId, mesRef: calcMesRef(f.data, novoCartaoId) });
+              }}>
                 <option value="">Selecione...</option>
                 {cartoes.map((c) => <option key={c.id} value={c.id}>{c.nome} ({c.banco})</option>)}
               </select>
@@ -503,6 +538,17 @@ function DespesaModal({
               </select>
             </div>
           )}
+          <div>
+            <label className="label">Data</label>
+            <input type="date" className="input" required value={f.data} onChange={(e) => {
+              const novaData = e.target.value;
+              setF({ ...f, data: novaData, mesRef: calcMesRef(novaData, isCartao ? f.cartaoId : undefined) });
+            }} />
+          </div>
+          <div>
+            <label className="label">Mês de referência</label>
+            <input type="month" className="input" required value={f.mesRef} onChange={(e) => setF({ ...f, mesRef: e.target.value })} />
+          </div>
 
           {!editing ? (
             <>
@@ -574,10 +620,17 @@ function DespesaModal({
           )}
 
           <div className="col-span-2 flex flex-col gap-2">
-            <label className="flex items-center gap-2 text-sm text-zinc-300">
-              <input type="checkbox" checked={!!f.pago} onChange={(e) => setF({ ...f, pago: e.target.checked })} className="accent-success" />
-              Já está pago
-            </label>
+            {f.forma !== "Cartão" && (
+              <label className="flex items-center gap-2 text-sm text-zinc-300">
+                <input type="checkbox" checked={!!f.pago} onChange={(e) => setF({ ...f, pago: e.target.checked })} className="accent-success" />
+                Já está pago
+              </label>
+            )}
+            {f.forma === "Cartão" && (
+              <div className="text-xs text-zinc-500 italic">
+                Despesas de cartão só são quitadas ao pagar a fatura na aba Cartões.
+              </div>
+            )}
             <label className="flex items-center gap-2 text-sm text-zinc-300">
               <input type="checkbox" checked={!!f.emprestado} onChange={(e) => setF({ ...f, emprestado: e.target.checked })} className="accent-loan" />
               Valor emprestado a terceiros

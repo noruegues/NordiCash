@@ -183,16 +183,17 @@ function ReceitasTab({ pendingEdit, clearPendingEdit, openModal, closeModal }: {
         ) : (
           <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
           <table className="t min-w-[680px]">
-            <thead><tr><th>Fonte</th><th>Categoria</th><th>Conta</th><th>Mês ref.</th><th>Recorrência</th><th className="text-right">Valor</th><th></th></tr></thead>
+            <thead><tr><th>Fonte</th><th>Categoria</th><th>Conta</th><th>Mês ref.</th><th>Recorrência</th><th>Tipo</th><th className="text-right">Valor</th><th></th></tr></thead>
             <tbody>
               {receitas.map((r) => (
-                <tr key={r.id}>
+                <tr key={r.id} className={r.emprestado ? "bg-loan/5" : ""}>
                   <td className="font-medium">{r.fonte}</td>
                   <td><span className="pill pill-info">{r.categoria}</span></td>
                   <td>{nomeConta(r.contaId)}</td>
                   <td className="text-zinc-400">{mesRefBR(r.mesRef)}</td>
                   <td>{r.recorrencia}</td>
-                  <td className="text-right font-semibold text-success">{brl(r.valor)}</td>
+                  <td>{r.emprestado ? <span className="pill pill-loan">Recebimento de empréstimo</span> : <span className="pill pill-success">Receita</span>}</td>
+                  <td className={`text-right font-semibold ${r.emprestado ? "text-loan" : "text-success"}`}>{brl(r.valor)}</td>
                   <td className="text-right">
                     <div className="inline-flex gap-1">
                       <button className="btn btn-ghost btn-sm btn-icon" onClick={() => { setEditing(r); setOpen(true); }}><Pencil size={13} /></button>
@@ -249,7 +250,7 @@ function ReceitaModal({
   editing: Receita | null; onSave: (items: Omit<Receita, "id">[]) => void;
 }) {
   const empty: Omit<Receita, "id"> = {
-    fonte: "", categoria: "", valor: 0, contaId: contas[0]?.id, mesRef: new Date().toISOString().slice(0, 7), recorrencia: "Única",
+    fonte: "", categoria: "", valor: 0, contaId: contas[0]?.id, mesRef: new Date().toISOString().slice(0, 7), recorrencia: "Única", emprestado: false,
   };
   const [f, setF] = useState<Omit<Receita, "id">>(empty);
   const [qtdMeses, setQtdMeses] = useState(12);
@@ -359,6 +360,12 @@ function ReceitaModal({
               </div>
             </div>
           )}
+          <div className="col-span-2">
+            <label className="flex items-center gap-2 text-sm text-zinc-300">
+              <input type="checkbox" checked={!!f.emprestado} onChange={(e) => setF({ ...f, emprestado: e.target.checked })} className="accent-loan" />
+              Recebimento de valor emprestado
+            </label>
+          </div>
         </div>
         <div className="flex gap-2 justify-end pt-2">
           <button type="button" className="btn btn-ghost" onClick={onClose}>Cancelar</button>

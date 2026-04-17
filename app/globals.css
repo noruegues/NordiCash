@@ -144,6 +144,7 @@ table.t tr:hover td { @apply bg-surface2/50; }
 .pill-warn    { @apply bg-warn/10 text-warn border-warn/20; }
 .pill-info    { @apply bg-primary/10 text-primary border-primary/20; }
 .pill-muted   { @apply bg-surface2 text-zinc-400 border-border; }
+.pill-loan    { @apply bg-loan/10 text-loan border-loan/20; }
 
 /* Modal */
 .modal-backdrop {

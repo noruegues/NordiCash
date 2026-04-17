@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, handleError, pick } from '@/lib/api-helpers'
 
-const ALLOWED_FIELDS = ['nome', 'banco', 'tipo', 'saldoInicial', 'cor']
+const ALLOWED_FIELDS = ['nome', 'banco', 'tipo', 'saldoInicial', 'cor', 'isDefault']
 
 export async function GET() {
   try {
@@ -25,6 +25,16 @@ export async function PATCH(req: Request) {
   try {
     const session = await requireAuth()
     const body = await req.json()
+
+    // Marcar como default: limpa os outros e marca este
+    if (body.setDefault && body.id) {
+      await prisma.$transaction([
+        prisma.contaBancaria.updateMany({ where: { userId: session.userId }, data: { isDefault: false } }),
+        prisma.contaBancaria.updateMany({ where: { id: body.id, userId: session.userId }, data: { isDefault: true } }),
+      ])
+      return NextResponse.json({ ok: true })
+    }
+
     const { id } = body
     const data = pick(body, ALLOWED_FIELDS)
     const conta = await prisma.contaBancaria.updateMany({ where: { id, userId: session.userId }, data })

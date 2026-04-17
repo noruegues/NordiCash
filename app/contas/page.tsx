@@ -5,28 +5,29 @@ import PageHeader from "@/components/ui/PageHeader";
 import Modal from "@/components/ui/Modal";
 import { useStore, type ContaBancaria } from "@/lib/store";
 import { brl } from "@/lib/format";
-import { Plus, Pencil, Trash2, Wallet, TrendingUp, TrendingDown } from "lucide-react";
+import { Plus, Pencil, Trash2, Wallet, TrendingUp, TrendingDown, Star } from "lucide-react";
 import MoneyInput from "@/components/ui/MoneyInput";
 import UpgradeModal from "@/components/UpgradeModal";
 import { useCurrentUser, getPlanLimit } from "@/lib/auth";
 import ExportButton from "@/components/ui/ExportButton";
 import { exportPDF, exportExcel } from "@/lib/export";
 
-// Saldo real = saldoInicial + entradas (receitas) - saídas (despesas pagas com essa conta; NÃO inclui cartão)
+// Saldo real = saldoInicial + entradas (receitas) - saídas
+// Saídas incluem: despesas diretas da conta + faturas de cartão já pagas com essa conta
 function saldoRealConta(contaId: string, state: ReturnType<typeof useStore.getState>) {
   const { receitas, despesas, contas } = state;
   const conta = contas.find((c) => c.id === contaId);
   if (!conta) return 0;
   const entradas = receitas.filter((r) => r.contaId === contaId).reduce((s, r) => s + r.valor, 0);
   const saidas = despesas
-    .filter((d) => d.contaId === contaId && !d.cartaoId)
+    .filter((d) => d.contaId === contaId && (!d.cartaoId || d.pago))
     .reduce((s, d) => s + d.valor, 0);
   return conta.saldoInicial + entradas - saidas;
 }
 
 export default function ContasPage() {
   const state = useStore();
-  const { contas, receitas, despesas, addConta, updateConta, removeConta } = state;
+  const { contas, receitas, despesas, addConta, updateConta, removeConta, setContaDefault } = state;
   const user = useCurrentUser();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<ContaBancaria | null>(null);
@@ -48,7 +49,7 @@ export default function ContasPage() {
       .filter((r) => r.contaId === c.id && r.mesRef <= mesAtual)
       .reduce((s, r) => s + r.valor, 0);
     const saidas = despesas
-      .filter((d) => d.contaId === c.id && !d.cartaoId && d.mesRef <= mesAtual)
+      .filter((d) => d.contaId === c.id && (!d.cartaoId || d.pago) && d.mesRef <= mesAtual)
       .reduce((s, d) => s + d.valor, 0);
     const saldo = c.saldoInicial + entradas - saidas;
     return { conta: c, entradas, saidas, saldo };
@@ -104,7 +105,7 @@ export default function ContasPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {saldosPorConta.map(({ conta: c, entradas, saidas, saldo }) => (
-              <div key={c.id} className="border border-border rounded p-4 bg-surface2/40 relative">
+              <div key={c.id} className="border border-border rounded p-4 bg-surface2/40 relative group">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded grid place-items-center text-white font-bold" style={{ background: c.cor }}>
                     {c.banco[0]}
@@ -130,7 +131,18 @@ export default function ContasPage() {
                     <div className="font-medium text-danger">{brl(saidas)}</div>
                   </div>
                 </div>
-                <div className="absolute top-3 right-3 flex gap-1">
+                <div className="absolute top-3 right-3 flex gap-1 items-center">
+                  <button
+                    className={`p-1 rounded transition ${
+                      c.isDefault
+                        ? "text-yellow-400"
+                        : "text-zinc-500 opacity-0 group-hover:opacity-100 hover:text-yellow-400"
+                    }`}
+                    onClick={() => !c.isDefault && setContaDefault(c.id)}
+                    title={c.isDefault ? "Conta padrão" : "Definir como padrão"}
+                  >
+                    <Star size={14} fill={c.isDefault ? "currentColor" : "none"} />
+                  </button>
                   <button className="btn btn-ghost btn-sm btn-icon" onClick={() => { setEditing(c); setOpen(true); }}><Pencil size={13} /></button>
                   <button className="btn btn-ghost btn-sm btn-icon hover:!text-danger" onClick={() => confirm("Apagar conta?") && removeConta(c.id)}><Trash2 size={13} /></button>
                 </div>

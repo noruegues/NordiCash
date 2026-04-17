@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, handleError, pick } from '@/lib/api-helpers'
 
-const ALLOWED_FIELDS = ['fonte', 'categoria', 'valor', 'contaId', 'mesRef', 'recorrencia', 'groupId']
+const ALLOWED_FIELDS = ['fonte', 'categoria', 'valor', 'contaId', 'mesRef', 'recorrencia', 'groupId', 'emprestado']
 
 export async function GET() {
   try {

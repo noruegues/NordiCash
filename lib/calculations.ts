@@ -59,15 +59,10 @@ export function depreciacao(b: Bem) {
 // Parcelas já pagas consomem o saldo pelo valor efetivamente pago; parcelas futuras
 // projetam o consumo pelo valor atualmente registrado (reduzido ou recalculado).
 export function simularCheiaConsorcio(c: Consorcio): number[] {
-  const totalDevido = c.valorCarta * (1 + c.taxaAdmin / 100);
-  let saldoRestante = totalDevido;
-  const out: number[] = [];
-  for (let i = 0; i < c.parcelas.length; i++) {
-    const restantes = c.parcelas.length - i;
-    out[i] = restantes > 0 ? Math.max(0, saldoRestante / restantes) : 0;
-    saldoRestante -= c.parcelas[i].valor;
-  }
-  return out;
+  // Usa cheiaSimulada armazenada (fixa, não muda ao editar valor).
+  // Fallback: valor / redução para parcelas migradas sem cheia.
+  const reducao = c.contemplado || c.pagamentoReduzido === false ? 1 : (c.percentualReducao ?? 0.5);
+  return c.parcelas.map((p) => p.cheiaSimulada ?? Math.round((p.valor / reducao) * 100) / 100);
 }
 
 export function consorcioStats(c: Consorcio) {

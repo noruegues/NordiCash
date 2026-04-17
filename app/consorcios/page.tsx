@@ -265,23 +265,34 @@ function ConsorcioModal({
           const mescladas = novas.map((np) => {
             const antiga = editing.parcelas.find((op) => op.numero === np.numero);
             if (antiga && (antiga.paga || antiga.status === "Pago")) {
-              return { ...np, valor: antiga.valor, paga: true, status: "Pago" as const, contemplado: antiga.contemplado };
+              return { ...np, valor: antiga.valor, cheiaSimulada: antiga.cheiaSimulada, paga: true, status: "Pago" as const, contemplado: antiga.contemplado };
             }
             return np;
           });
+          // Modelo flat: todas as não pagas recebem o MESMO valor
+          // cheia = saldoDevedor / qtd não pagas. valor = cheia × redução.
           const totalDevido = base.valorCarta * (1 + Number(taxaAdminCalc.toFixed(2)) / 100);
-          const totalPago = mescladas.filter((p) => p.status === "Pago").reduce((s, p) => s + p.valor, 0);
-          const naoPagasCount = mescladas.filter((p) => p.status !== "Pago").length;
-          const saldoRestante = Math.max(0, totalDevido - totalPago);
-          const cheiaNaoPaga = naoPagasCount > 0 ? saldoRestante / naoPagasCount : 0;
-          // Enquanto não contemplado, aplica a redução (ex: 50%) sobre o valor cheio.
-          // Quando contemplado, usa valor cheio (pagar tudo = saldo zero).
           const reducao = base.contemplado || base.pagamentoReduzido === false ? 1 : (base.percentualReducao ?? 0.5);
-          const valorNaoPaga = Math.round(cheiaNaoPaga * reducao * 100) / 100;
-          const final = mescladas.map((p) => (p.status === "Pago" ? p : { ...p, valor: valorNaoPaga }));
+          const ordenadas = [...mescladas].sort((a, b) => a.numero - b.numero);
+          const paidValorSum = ordenadas.filter((p) => p.status === "Pago").reduce((s, p) => s + p.valor, 0);
+          const saldoBase = Math.max(0, totalDevido - paidValorSum);
+          const unpaidCount = ordenadas.filter((p) => p.status !== "Pago").length;
+          const cheiaFlat = unpaidCount > 0 ? Math.round((saldoBase / unpaidCount) * 100) / 100 : 0;
+          const valorFlat = Math.round(cheiaFlat * reducao * 100) / 100;
+          const final = ordenadas.map((p) => {
+            if (p.status === "Pago") return p;
+            return { ...p, valor: valorFlat, cheiaSimulada: cheiaFlat };
+          });
           onSave({ ...base, parcelas: final });
         } else {
-          onSave({ ...base, parcelas: gerarParcelas(base) });
+          // Novo consórcio: todas as parcelas com o mesmo valor (flat)
+          const totalDevido = base.valorCarta * (1 + Number(taxaAdminCalc.toFixed(2)) / 100);
+          const reducao = base.contemplado || base.pagamentoReduzido === false ? 1 : (base.percentualReducao ?? 0.5);
+          const novas = gerarParcelas(base);
+          const cheiaFlat = Math.round((totalDevido / novas.length) * 100) / 100;
+          const valorFlat = Math.round(cheiaFlat * reducao * 100) / 100;
+          const parcelas = novas.map((p) => ({ ...p, valor: valorFlat, cheiaSimulada: cheiaFlat }));
+          onSave({ ...base, parcelas });
         }
       }}>
         <div className="grid grid-cols-2 gap-3">
