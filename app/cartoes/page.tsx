@@ -223,10 +223,10 @@ export default function CartoesPage() {
               <Card title={`Limite — ${cartao.nome}`}>
                 <ProgressBar value={usadoTotal} max={cartao.limite} highlight={totalMesAberto} />
                 <div className="mt-3 space-y-1 text-xs">
-                  <div className="flex justify-between"><span className="text-zinc-400">Limite total</span><span className="font-semibold text-zinc-100">{brl(cartao.limite)}</span></div>
-                  <div className="flex justify-between"><span className="text-zinc-400">Utilizado total</span><span className="font-semibold text-zinc-100">{brl(usadoTotal)}</span></div>
-                  <div className="flex justify-between"><span className="text-primary">Mês {mesFatura}</span><span className="font-semibold text-primary">{brl(totalMesAberto)}</span></div>
-                  <div className="flex justify-between border-t border-border pt-1 mt-1"><span className="text-zinc-400">Disponível</span><span className="font-semibold text-success">{brl(cartao.limite - usadoTotal)}</span></div>
+                  <div className="flex justify-between"><span className="text-zinc-400">Limite total</span><span className="font-semibold text-zinc-100" data-money>{brl(cartao.limite)}</span></div>
+                  <div className="flex justify-between"><span className="text-zinc-400">Utilizado total</span><span className="font-semibold text-zinc-100" data-money>{brl(usadoTotal)}</span></div>
+                  <div className="flex justify-between"><span className="text-primary">Mês {mesFatura}</span><span className="font-semibold text-primary" data-money>{brl(totalMesAberto)}</span></div>
+                  <div className="flex justify-between border-t border-border pt-1 mt-1"><span className="text-zinc-400">Disponível</span><span className="font-semibold text-success" data-money>{brl(cartao.limite - usadoTotal)}</span></div>
                 </div>
                 {pct >= 90 && <div className="mt-3 text-xs text-danger">⚠️ Acima de 90% do limite</div>}
                 {pct >= 70 && pct < 90 && <div className="mt-3 text-xs text-warn">⚠️ Atenção: 70% do limite usado</div>}

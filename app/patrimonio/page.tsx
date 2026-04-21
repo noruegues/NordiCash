@@ -285,9 +285,9 @@ export default function PatrimonioPage() {
             </div>
           </div>
           <div className="grid grid-cols-3 gap-3 mt-4 text-sm">
-            <div className="card"><div className="card-body !p-3"><div className="text-xs text-zinc-500">Atual</div><div className="font-semibold text-base">{brl(patrimonioAtual)}</div></div></div>
-            <div className="card border-primary/30"><div className="card-body !p-3"><div className="text-xs text-primary">Projetado ({horizonteAnos}a)</div><div className="font-semibold text-base">{brl(patrimonioFuturo)}</div></div></div>
-            <div className="card"><div className="card-body !p-3"><div className="text-xs text-success">Δ</div><div className="font-semibold text-base text-success">+{brl(patrimonioFuturo - patrimonioAtual)}</div></div></div>
+            <div className="card"><div className="card-body !p-3"><div className="text-xs text-zinc-500">Atual</div><div className="font-semibold text-base" data-money>{brl(patrimonioAtual)}</div></div></div>
+            <div className="card border-primary/30"><div className="card-body !p-3"><div className="text-xs text-primary">Projetado ({horizonteAnos}a)</div><div className="font-semibold text-base" data-money>{brl(patrimonioFuturo)}</div></div></div>
+            <div className="card"><div className="card-body !p-3"><div className="text-xs text-success">Δ</div><div className="font-semibold text-base text-success" data-money>+{brl(patrimonioFuturo - patrimonioAtual)}</div></div></div>
           </div>
         </Card>
       </div>

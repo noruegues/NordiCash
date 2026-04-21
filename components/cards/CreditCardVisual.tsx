@@ -25,8 +25,8 @@ export default function CreditCardVisual({
       </div>
       <div className="absolute bottom-5 left-5 right-5">
         <div className="text-white/50 text-[10px] tracking-widest">**** **** **** {cartao.id.slice(-4).toUpperCase()}</div>
-        <div className="text-white text-sm mt-1 font-mono">
-          R$ {usado.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} / {cartao.limite.toLocaleString("pt-BR")}
+        <div className="text-white text-sm mt-1 font-mono" data-money>
+          R$ {usado.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / {cartao.limite.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </div>
         <div className="mt-1.5 h-1 rounded-full bg-white/10 overflow-hidden">
           <div className="h-full bg-white/80" style={{ width: `${Math.min(100, (usado / cartao.limite) * 100)}%` }} />

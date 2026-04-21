@@ -63,8 +63,8 @@ export default function PieCategoria({
                   style={{ backgroundColor: COLORS[i % COLORS.length] }}
                 />
                 <span className="truncate text-zinc-400 flex-1">{d.name}</span>
-                <span className="font-medium text-zinc-200 whitespace-nowrap">{brl(d.value)}</span>
-                <span className="text-zinc-500 w-12 text-right">{pct}%</span>
+                <span className="font-medium text-zinc-200 whitespace-nowrap" data-money>{brl(d.value)}</span>
+                <span className="text-zinc-500 w-12 text-right" data-money>{pct}%</span>
               </div>
             );
           })}

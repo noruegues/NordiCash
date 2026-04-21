@@ -210,7 +210,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <div className="text-[11px] text-zinc-500 uppercase tracking-wider">{label}</div>
-      <div className="text-lg font-semibold mt-0.5">{value}</div>
+      <div className="text-lg font-semibold mt-0.5" data-money>{value}</div>
     </div>
   );
 }

@@ -7,14 +7,19 @@ export type MonthFilterValue =
   | { mode: "range"; from: string; to: string }
   | { mode: "all" };
 
-export function applyMonthFilter<T extends { mesRef: string }>(items: T[], v: MonthFilterValue): T[] {
+export function applyMonthFilter<T extends { mesRef: string; data?: string }>(
+  items: T[],
+  v: MonthFilterValue,
+  field: "mesRef" | "data" = "mesRef",
+): T[] {
+  const get = (i: T) => (field === "data" ? (i.data ?? "").slice(0, 7) : i.mesRef);
   if (v.mode === "all") return items;
   if (v.mode === "current") {
     const now = new Date().toISOString().slice(0, 7);
-    return items.filter((i) => i.mesRef === now);
+    return items.filter((i) => get(i) === now);
   }
-  if (v.mode === "month") return items.filter((i) => i.mesRef === v.mes);
-  return items.filter((i) => i.mesRef >= v.from && i.mesRef <= v.to);
+  if (v.mode === "month") return items.filter((i) => get(i) === v.mes);
+  return items.filter((i) => get(i) >= v.from && get(i) <= v.to);
 }
 
 export default function MonthFilter({

@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/Card";
 import PageHeader from "@/components/ui/PageHeader";
 import AreaFlow from "@/components/charts/AreaFlow";
 import PieCategoria from "@/components/charts/PieCategoria";
+import PatrimonioEvolucao from "@/components/charts/PatrimonioEvolucao";
 import { brl, dataBR } from "@/lib/format";
 import { useStore } from "@/lib/store";
 import { TrendingUp, TrendingDown, Wallet, LineChart } from "lucide-react";
@@ -14,14 +15,15 @@ type Periodo = "todos" | "mes" | "3m" | "6m" | "ano" | "custom";
 function inPeriodo(mesRef: string, periodo: Periodo, custom?: { from: string; to: string }) {
   if (periodo === "todos") return true;
   const hoje = new Date();
-  const ref = new Date(mesRef + "-01");
-  if (periodo === "mes") return mesRef === hoje.toISOString().slice(0, 7);
+  const hojeRef = hoje.toISOString().slice(0, 7);
+  if (periodo === "mes") return mesRef === hojeRef;
   if (periodo === "3m" || periodo === "6m") {
     const meses = periodo === "3m" ? 3 : 6;
     const limite = new Date(hoje.getFullYear(), hoje.getMonth() - meses + 1, 1);
-    return ref >= limite;
+    const limiteRef = `${limite.getFullYear()}-${String(limite.getMonth() + 1).padStart(2, "0")}`;
+    return mesRef >= limiteRef && mesRef <= hojeRef;
   }
-  if (periodo === "ano") return ref.getFullYear() === hoje.getFullYear();
+  if (periodo === "ano") return mesRef.slice(0, 4) === String(hoje.getFullYear());
   if (periodo === "custom" && custom?.from && custom?.to) {
     return mesRef >= custom.from && mesRef <= custom.to;
   }
@@ -29,10 +31,11 @@ function inPeriodo(mesRef: string, periodo: Periodo, custom?: { from: string; to
 }
 
 export default function Dashboard() {
-  const { receitas, despesas, investimentos } = useStore();
-  const [periodo, setPeriodo] = useState<Periodo>("todos");
+  const { receitas, despesas, investimentos, contas, bens, consorcios } = useStore();
+  const [periodo, setPeriodo] = useState<Periodo>("ano");
   const [custom, setCustom] = useState({ from: "", to: "" });
   const [incluirEmprestados, setIncluirEmprestados] = useState(false);
+  const [filtroCategoria, setFiltroCategoria] = useState<"tudo" | "pago" | "provisionado">("tudo");
 
   // Até o mês atual (inclusive). Valores projetados em meses futuros não entram no realizado:
   // - Receitas: só as já recebidas (mesRef <= mês atual)
@@ -117,8 +120,13 @@ export default function Dashboard() {
     };
   }, [recF, desF, receitas, despesas]);
 
+  const desCategoria = desF.filter((d) => {
+    if (filtroCategoria === "pago") return d.pago;
+    if (filtroCategoria === "provisionado") return !d.pago;
+    return true;
+  });
   const porCategoria = Object.entries(
-    desF.reduce<Record<string, number>>((acc, d) => {
+    desCategoria.reduce<Record<string, number>>((acc, d) => {
       acc[d.categoria] = (acc[d.categoria] || 0) + d.valor;
       return acc;
     }, {})
@@ -141,6 +149,31 @@ export default function Dashboard() {
   );
   const emptyFluxo = () => ({ receitaRecebida: 0, receitaEmprestimo: 0, receitaProv: 0, despesaPaga: 0, despesaProv: 0 });
   const fluxoMap = new Map<string, ReturnType<typeof emptyFluxo>>();
+  // Pré-popula meses do período (mesmo sem dados) para que o eixo X mostre o range completo
+  const mesesPeriodo = (() => {
+    const hoje = new Date();
+    const rangeMeses = (startY: number, startM: number, endY: number, endM: number) => {
+      const out: string[] = [];
+      const d = new Date(startY, startM, 1);
+      const end = new Date(endY, endM, 1);
+      while (d <= end) {
+        out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+        d.setMonth(d.getMonth() + 1);
+      }
+      return out;
+    };
+    if (periodo === "mes") return [hoje.toISOString().slice(0, 7)];
+    if (periodo === "3m") return rangeMeses(hoje.getFullYear(), hoje.getMonth() - 2, hoje.getFullYear(), hoje.getMonth());
+    if (periodo === "6m") return rangeMeses(hoje.getFullYear(), hoje.getMonth() - 5, hoje.getFullYear(), hoje.getMonth());
+    if (periodo === "ano") return rangeMeses(hoje.getFullYear(), 0, hoje.getFullYear(), hoje.getMonth());
+    if (periodo === "custom" && custom.from && custom.to) {
+      const [fy, fm] = custom.from.split("-").map(Number);
+      const [ty, tm] = custom.to.split("-").map(Number);
+      return rangeMeses(fy, fm - 1, ty, tm - 1);
+    }
+    return [] as string[];
+  })();
+  mesesPeriodo.forEach((m) => fluxoMap.set(m, emptyFluxo()));
   allRecPeriodo.forEach((r) => {
     const cur = fluxoMap.get(r.mesRef) || emptyFluxo();
     if (r.mesRef <= mesAtual) {
@@ -157,9 +190,34 @@ export default function Dashboard() {
     else cur.despesaProv += d.valor;
     fluxoMap.set(d.mesRef, cur);
   });
+  const MESES_ABREV = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+  const fmtMes = (mesRef: string) => {
+    const [y, m] = mesRef.split("-").map(Number);
+    return `${MESES_ABREV[m - 1]}${String(y).slice(2)}`;
+  };
   const fluxo = Array.from(fluxoMap.entries())
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([mes, v]) => ({ mes: mes.slice(5), ...v }));
+    .map(([mes, v]) => ({ mes: fmtMes(mes), ...v }));
+
+  // Evolução do patrimônio líquido por mês (retroativa).
+  // Só saldoContas varia mês a mês (reflete fluxo de caixa).
+  // Investimentos / bens / consórcios contemplados entram como valor atual (não há histórico).
+  const totalInvAtual = investimentos.reduce((s, i) => s + i.saldoAtual, 0);
+  const totalBensAtual = bens.reduce((s, b) => s + b.valorMercado, 0);
+  const totalDividasAtual = bens.reduce((s, b) => s + b.dividaRestante, 0);
+  const totalConsContemplados = consorcios
+    .filter((c) => c.contemplado)
+    .reduce((s, c) => s + c.valorCarta, 0);
+  const saldoInicialContas = contas.reduce((s, c) => s + c.saldoInicial, 0);
+  const patrimonioSerie = mesesPeriodo
+    .filter((m) => m <= mesAtual)
+    .map((m) => {
+      const entradas = receitas.filter((r) => r.mesRef <= m).reduce((s, r) => s + r.valor, 0);
+      const saidas = despesas.filter((d) => !d.cartaoId && d.mesRef <= m).reduce((s, d) => s + d.valor, 0);
+      const saldoContasM = saldoInicialContas + entradas - saidas;
+      const patrimonio = saldoContasM + totalInvAtual + totalBensAtual - totalDividasAtual + totalConsContemplados;
+      return { mes: fmtMes(m), patrimonio: Math.round(patrimonio * 100) / 100 };
+    });
 
   const periodos: { key: Periodo; label: string }[] = [
     { key: "todos", label: "Todos" },
@@ -206,10 +264,10 @@ export default function Dashboard() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard label="Receitas" value={brl(totalReceita)} delta={deltaReceita} deltaLabel={deltaLabel} icon={<TrendingUp size={18} />} accent />
-        <KpiCard label="Despesas" value={brl(totalDespesa)} delta={deltaDespesa} deltaLabel={deltaLabel} icon={<TrendingDown size={18} />} />
-        <KpiCard label="Saldo" value={brl(saldo)} delta={deltaSaldo} deltaLabel={deltaLabel} icon={<Wallet size={18} />} />
-        <KpiCard label="Investimentos" value={brl(totalInv)} delta={deltaInv} icon={<LineChart size={18} />} />
+        <KpiCard label="Receitas" value={brl(totalReceita)} icon={<TrendingUp size={18} />} accent />
+        <KpiCard label="Despesas" value={brl(totalDespesa)} icon={<TrendingDown size={18} />} />
+        <KpiCard label="Saldo" value={brl(saldo)} valueClass={saldo < 0 ? "text-danger" : undefined} icon={<Wallet size={18} />} />
+        <KpiCard label="Investimentos" value={brl(totalInv)} icon={<LineChart size={18} />} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -232,29 +290,72 @@ export default function Dashboard() {
         >
           {fluxo.length ? <AreaFlow data={fluxo} /> : <Empty />}
         </Card>
-        <Card title="Despesas por categoria">
+        <Card
+          title={
+            <div className="flex items-center justify-between gap-3 w-full">
+              <span>Despesas por categoria</span>
+              <div className="flex rounded border border-border overflow-hidden text-[11px]">
+                {([
+                  { k: "tudo", l: "Tudo" },
+                  { k: "pago", l: "Pago" },
+                  { k: "provisionado", l: "Provisionado" },
+                ] as const).map((o) => (
+                  <button
+                    key={o.k}
+                    type="button"
+                    onClick={() => setFiltroCategoria(o.k)}
+                    className={`px-2 py-1 ${filtroCategoria === o.k ? "bg-primary text-white" : "text-zinc-400 hover:bg-surface2"} ${o.k !== "tudo" ? "border-l border-border" : ""}`}
+                  >{o.l}</button>
+                ))}
+              </div>
+            </div>
+          }
+        >
           {porCategoria.length ? <PieCategoria data={porCategoria} showPercent /> : <Empty />}
         </Card>
       </div>
 
+      <Card
+        title={
+          <div className="flex items-center gap-3">
+            <span>Evolução do patrimônio líquido</span>
+            {patrimonioSerie.length > 1 && (() => {
+              const ini = patrimonioSerie[0].patrimonio;
+              const fim = patrimonioSerie.at(-1)!.patrimonio;
+              const delta = fim - ini;
+              const pos = delta >= 0;
+              return (
+                <span className={`text-xs font-medium ${pos ? "text-success" : "text-danger"}`}>
+                  {pos ? "+" : ""}{brl(delta)} no período
+                </span>
+              );
+            })()}
+          </div>
+        }
+      >
+        {patrimonioSerie.length ? <PatrimonioEvolucao data={patrimonioSerie} /> : <Empty />}
+      </Card>
+
       <Card title="Últimas transações">
         {desF.length ? (
-          <table className="t">
-            <thead>
-              <tr><th>Descrição</th><th>Categoria</th><th>Forma</th><th>Data</th><th className="text-right">Valor</th></tr>
-            </thead>
-            <tbody>
-              {desF.slice(-8).reverse().map((d) => (
-                <tr key={d.id}>
-                  <td>{d.descricao}</td>
-                  <td><span className="pill pill-muted">{d.categoria}</span></td>
-                  <td className="text-zinc-400">{d.forma}</td>
-                  <td className="text-zinc-500">{dataBR(d.data)}</td>
-                  <td className={`text-right font-medium ${d.emprestado ? "text-loan" : ""}`}>{brl(d.valor)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+            <table className="t min-w-[560px]">
+              <thead>
+                <tr><th>Descrição</th><th>Categoria</th><th>Forma</th><th>Data</th><th className="text-right">Valor</th></tr>
+              </thead>
+              <tbody>
+                {desF.slice(-8).reverse().map((d) => (
+                  <tr key={d.id}>
+                    <td>{d.descricao}</td>
+                    <td><span className="pill pill-muted">{d.categoria}</span></td>
+                    <td className="text-zinc-400">{d.forma}</td>
+                    <td className="text-zinc-500">{dataBR(d.data)}</td>
+                    <td className={`text-right font-medium ${d.emprestado ? "text-loan" : ""}`}>{brl(d.valor)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : <Empty />}
       </Card>
     </div>

@@ -220,6 +220,7 @@ export default function DespesasPage() {
               if (sortCol === "descricao") return dir * a.descricao.localeCompare(b.descricao);
               if (sortCol === "categoria") return dir * a.categoria.localeCompare(b.categoria);
               if (sortCol === "forma") return dir * a.forma.localeCompare(b.forma);
+              if (sortCol === "data") return dir * a.data.localeCompare(b.data);
               if (sortCol === "mesRef") return dir * a.mesRef.localeCompare(b.mesRef);
               if (sortCol === "valor") return dir * (a.valor - b.valor);
               // default "recent": por posição original (mais recente primeiro)
@@ -266,11 +267,12 @@ export default function DespesasPage() {
             <table className="t min-w-[720px]">
               <thead><tr>
                 <th className="w-10">Pago</th>
+                <th className="cursor-pointer select-none" onClick={() => toggleSort("data")}><span className="inline-flex items-center gap-1">Data <SortIcon col="data" /></span></th>
                 <th className="cursor-pointer select-none" onClick={() => toggleSort("descricao")}><span className="inline-flex items-center gap-1">Descrição <SortIcon col="descricao" /></span></th>
                 <th className="cursor-pointer select-none" onClick={() => toggleSort("categoria")}><span className="inline-flex items-center gap-1">Categoria <SortIcon col="categoria" /></span></th>
                 <th className="cursor-pointer select-none" onClick={() => toggleSort("forma")}><span className="inline-flex items-center gap-1">Forma <SortIcon col="forma" /></span></th>
                 <th>Origem</th>
-                <th className="cursor-pointer select-none" onClick={() => toggleSort("mesRef")}><span className="inline-flex items-center gap-1">Mês <SortIcon col="mesRef" /></span></th>
+                <th className="cursor-pointer select-none" onClick={() => toggleSort("mesRef")}><span className="inline-flex items-center gap-1">Mês ref. <SortIcon col="mesRef" /></span></th>
                 <th className="text-right cursor-pointer select-none" onClick={() => toggleSort("valor")}><span className="inline-flex items-center gap-1 justify-end">Valor <SortIcon col="valor" /></span></th>
                 <th></th>
               </tr></thead>
@@ -311,6 +313,7 @@ export default function DespesasPage() {
                         </button>
                       )}
                     </td>
+                    <td className="text-zinc-500 whitespace-nowrap">{new Date(d.data + "T12:00:00").toLocaleDateString("pt-BR")}</td>
                     <td className="font-medium">{d.descricao}</td>
                     <td><span className="pill pill-muted">{d.categoria}</span></td>
                     <td>{d.forma}</td>

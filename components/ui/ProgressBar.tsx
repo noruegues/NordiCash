@@ -16,8 +16,8 @@ export default function ProgressBar({
   return (
     <div>
       <div className="flex justify-between text-xs text-zinc-400 mb-1.5">
-        <span>{brl(value)}</span>
-        <span>{brl(max)}</span>
+        <span data-money>{brl(value)}</span>
+        <span data-money>{brl(max)}</span>
       </div>
       <div className="relative h-2.5 rounded-full bg-surface2 overflow-hidden">
         <div className={`absolute inset-y-0 left-0 ${color} transition-all`} style={{ width: `${pct}%` }} />
@@ -30,8 +30,8 @@ export default function ProgressBar({
         )}
       </div>
       <div className="text-xs text-zinc-500 mt-1.5 flex justify-between">
-        <span>{pct.toFixed(0)}% utilizado</span>
-        {hl > 0 && <span className="text-primary">Mês: {brl(hl)} ({pctHl.toFixed(0)}%)</span>}
+        <span data-money>{pct.toFixed(0)}% utilizado</span>
+        {hl > 0 && <span className="text-primary" data-money>Mês: {brl(hl)} ({pctHl.toFixed(0)}%)</span>}
       </div>
     </div>
   );

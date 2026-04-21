@@ -1,5 +1,5 @@
 "use client";
-import { Search, Bell, Sun, Moon, AlertTriangle, CheckCircle2, CreditCard, X, LogOut, User as UserIcon, Lock, Crown, Camera, Menu } from "lucide-react";
+import { Search, Bell, Sun, Moon, Eye, EyeOff, AlertTriangle, CheckCircle2, CreditCard, X, LogOut, User as UserIcon, Lock, Crown, Camera, Menu } from "lucide-react";
 import { useStore, usoCartao } from "@/lib/store";
 import { useAuth, useCurrentUser, type Plano } from "@/lib/auth";
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
@@ -9,7 +9,7 @@ import SearchModal from "@/components/SearchModal";
 
 export default function Topbar({ onOpenSidebar }: { onOpenSidebar?: () => void }) {
   const { cartoes, despesas, marcarFaturaPaga } = useStore();
-  const { theme, toggleTheme, logout } = useAuth();
+  const { theme, toggleTheme, hideValues, toggleHideValues, logout } = useAuth();
   const user = useCurrentUser();
 
   const [openNotif, setOpenNotif] = useState(false);
@@ -39,9 +39,11 @@ export default function Topbar({ onOpenSidebar }: { onOpenSidebar?: () => void }
     for (const c of cartoes) {
       const usado = usoCartao(c.id, despesas, c.faturaPagaMes);
       const pct = c.limite > 0 ? (usado / c.limite) * 100 : 0;
-      const overdue = c.faturaPagaMes !== mesAtual && today.getDate() > c.diaVencimento;
-      if (overdue && usado > 0) {
-        list.push({ id: `over-${c.id}`, type: "danger", title: `Fatura em atraso · ${c.nome}`, desc: `Vencimento dia ${c.diaVencimento} · ${brl(usado)}`, cartaoId: c.id });
+      const itensMesAtual = despesas.filter((d) => d.cartaoId === c.id && d.mesRef === mesAtual);
+      const faturaAberta = itensMesAtual.filter((d) => !d.pago).reduce((s, d) => s + d.valor, 0);
+      const overdue = c.faturaPagaMes !== mesAtual && today.getDate() > c.diaVencimento && faturaAberta > 0;
+      if (overdue) {
+        list.push({ id: `over-${c.id}`, type: "danger", title: `Fatura em atraso · ${c.nome}`, desc: `Vencimento dia ${c.diaVencimento} · ${brl(faturaAberta)}`, cartaoId: c.id });
       } else if (pct >= 90) {
         list.push({ id: `lim-${c.id}`, type: "warn", title: `Limite quase no fim · ${c.nome}`, desc: `${pct.toFixed(0)}% utilizado · ${brl(usado)}/${brl(c.limite)}`, cartaoId: c.id });
       }
@@ -82,6 +84,11 @@ export default function Topbar({ onOpenSidebar }: { onOpenSidebar?: () => void }
       </button>
 
       <div className="flex-1" />
+
+      {/* HIDE VALUES TOGGLE */}
+      <button className="btn btn-ghost btn-icon" title={hideValues ? "Mostrar valores" : "Ocultar valores"} onClick={toggleHideValues}>
+        {hideValues ? <EyeOff size={16} /> : <Eye size={16} />}
+      </button>
 
       {/* THEME TOGGLE */}
       <button className="btn btn-ghost btn-icon" title={theme === "dark" ? "Tema claro" : "Tema escuro"} onClick={toggleTheme}>

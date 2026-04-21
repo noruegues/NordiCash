@@ -21,6 +21,7 @@ export type User = {
 type AuthState = {
   user: User | null;
   theme: "dark" | "light";
+  hideValues: boolean;
   showWelcome: boolean;
   loading: boolean;
 
@@ -33,6 +34,7 @@ type AuthState = {
   setPlano: (plano: Plano) => void;
   setTheme: (t: "dark" | "light") => void;
   toggleTheme: () => void;
+  toggleHideValues: () => void;
   dismissWelcome: () => Promise<void>;
 };
 
@@ -41,6 +43,7 @@ export const useAuth = create<AuthState>()(
     (set, get) => ({
       user: null,
       theme: "dark",
+      hideValues: false,
       showWelcome: false,
       loading: true,
 
@@ -136,6 +139,14 @@ export const useAuth = create<AuthState>()(
         get().setTheme(next);
       },
 
+      toggleHideValues: () => {
+        const next = !get().hideValues;
+        set({ hideValues: next });
+        if (typeof document !== "undefined") {
+          document.documentElement.classList.toggle("hide-values", next);
+        }
+      },
+
       dismissWelcome: async () => {
         set({ showWelcome: false });
         await get().updateProfile({ welcomeSeen: true } as Partial<User>);
@@ -144,10 +155,11 @@ export const useAuth = create<AuthState>()(
     {
       name: "finance-saas-auth",
       version: 2,
-      partialize: (state) => ({ theme: state.theme }),
+      partialize: (state) => ({ theme: state.theme, hideValues: state.hideValues }),
       onRehydrateStorage: () => (state) => {
         if (state && typeof document !== "undefined") {
           document.documentElement.classList.toggle("light", state.theme === "light");
+          document.documentElement.classList.toggle("hide-values", !!state.hideValues);
         }
       },
     }
