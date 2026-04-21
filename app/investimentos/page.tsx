@@ -10,8 +10,8 @@ import { useStore, type Investimento } from "@/lib/store";
 import MoneyInput from "@/components/ui/MoneyInput";
 import NumberInput from "@/components/ui/NumberInput";
 import { projecaoInvestimento, projecaoPortfolio } from "@/lib/calculations";
-import { brl, dataBR } from "@/lib/format";
-import { LineChart, Plus, Pencil, Trash2, RefreshCw, Info } from "lucide-react";
+import { brl, dataBR, todayLocal } from "@/lib/format";
+import { LineChart, Plus, Pencil, Trash2, RefreshCw, Info, Check, X } from "lucide-react";
 import { useIndicadores } from "@/lib/indicadores";
 import ExportButton from "@/components/ui/ExportButton";
 import { exportPDF, exportExcel } from "@/lib/export";
@@ -199,7 +199,9 @@ export default function InvestimentosPage() {
                     <td className="text-zinc-500">{dataBR(i.inicio)}</td>
                     <td className="text-right">{brl(i.valorInicial)}</td>
                     <td className="text-right">{brl(i.aporteMensal)}</td>
-                    <td className="text-right text-success font-semibold">{brl(i.saldoAtual)}</td>
+                    <td className="text-right text-success font-semibold">
+                      <SaldoAtualCell value={i.saldoAtual} onSave={(v) => updateInvestimento(i.id, { saldoAtual: v })} />
+                    </td>
                     <td className={`text-right text-xs ${rend >= 0 ? "text-success" : "text-danger"}`}>{rend >= 0 ? "+" : ""}{brl(rend)}</td>
                     <td className="text-right">
                       <div className="inline-flex gap-1">
@@ -237,7 +239,7 @@ function InvModal({
 }) {
   const empty: Omit<Investimento, "id"> = {
     nome: "", tipo: "Renda Fixa", valorInicial: 0, aporteMensal: 0, saldoAtual: 0,
-    inicio: new Date().toISOString().slice(0, 10), taxaMensal: 0.9,
+    inicio: todayLocal(), taxaMensal: 0.9,
   };
   const [f, setF] = useState<Omit<Investimento, "id">>(empty);
   useEffect(() => {
@@ -287,5 +289,45 @@ function InvModal({
         </div>
       </form>
     </Modal>
+  );
+}
+
+function SaldoAtualCell({ value, onSave }: { value: number; onSave: (v: number) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+
+  function commit() {
+    if (draft >= 0) onSave(draft);
+    setEditing(false);
+  }
+  function cancel() {
+    setDraft(value);
+    setEditing(false);
+  }
+
+  if (editing) {
+    return (
+      <div className="inline-flex items-center gap-1 justify-end">
+        <MoneyInput
+          value={draft}
+          onChange={(v) => setDraft(v)}
+          className="w-32 [&_input]:!h-7 [&_input]:!text-xs [&_input]:!py-1 [&_input]:!text-right"
+        />
+        <button type="button" className="btn btn-ghost btn-sm btn-icon !h-7 !w-7 !text-success" onMouseDown={(e) => { e.preventDefault(); commit(); }} title="Salvar">
+          <Check size={13} />
+        </button>
+        <button type="button" className="btn btn-ghost btn-sm btn-icon !h-7 !w-7 hover:!text-danger" onMouseDown={(e) => { e.preventDefault(); cancel(); }} title="Cancelar">
+          <X size={13} />
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="inline-flex items-center gap-1 group justify-end">
+      <span>{brl(value)}</span>
+      <button type="button" className="btn btn-ghost btn-sm btn-icon !h-6 !w-6 opacity-0 group-hover:opacity-100 transition !text-zinc-300" title="Atualizar saldo" onClick={() => { setDraft(value); setEditing(true); }}>
+        <Pencil size={11} />
+      </button>
+    </div>
   );
 }

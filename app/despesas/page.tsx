@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/Card";
 import PageHeader from "@/components/ui/PageHeader";
 import Modal from "@/components/ui/Modal";
 import { useStore, type Despesa, type ContaBancaria, type Cartao, type FormaPagamento, type RecorrenciaTipo } from "@/lib/store";
-import { brl, mesRefBR } from "@/lib/format";
+import { brl, mesRefBR, todayLocal } from "@/lib/format";
 import { Plus, Pencil, Trash2, Check, CheckCheck, AlertTriangle, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, Info } from "lucide-react";
 import MacroView from "@/components/MacroView";
 import MoneyInput from "@/components/ui/MoneyInput";
@@ -426,7 +426,7 @@ function DespesaModal({
   editing: Despesa | null;
   onSave: (items: Omit<Despesa, "id">[]) => void;
 }) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocal();
   const defaultCartao = cartoes.find((c) => c.isDefault) || (cartoes.length === 1 ? cartoes[0] : null);
   const empty: Omit<Despesa, "id"> = {
     descricao: "", categoria: "", valor: 0, data: today, mesRef: today.slice(0, 7),
@@ -456,6 +456,16 @@ function DespesaModal({
     }
     return mesRef;
   }
+
+  // Sincroniza mês de referência sempre que forma/cartão/data mudam (apenas em criação)
+  useEffect(() => {
+    if (editing) return;
+    const desejado = f.forma === "Cartão" ? calcMesRef(f.data, f.cartaoId) : f.data.slice(0, 7);
+    if (desejado !== f.mesRef) {
+      setF((prev) => ({ ...prev, mesRef: desejado }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [f.forma, f.cartaoId, f.data, editing]);
 
   const formas: FormaPagamento[] = ["Pix", "Débito", "Dinheiro", "Boleto", "Cartão"];
   const recs: RecorrenciaTipo[] = ["Única", "Recorrente", "Indeterminada"];
@@ -517,7 +527,15 @@ function DespesaModal({
           </div>
           <div>
             <label className="label">Forma de pagamento</label>
-            <select className="select" value={f.forma} onChange={(e) => setF({ ...f, forma: e.target.value as FormaPagamento })}>
+            <select className="select" value={f.forma} onChange={(e) => {
+              const novaForma = e.target.value as FormaPagamento;
+              const virouCartao = novaForma === "Cartão";
+              setF({
+                ...f,
+                forma: novaForma,
+                mesRef: virouCartao ? calcMesRef(f.data, f.cartaoId) : f.data.slice(0, 7),
+              });
+            }}>
               {formas.map((x) => <option key={x}>{x}</option>)}
             </select>
           </div>

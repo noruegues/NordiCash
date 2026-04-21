@@ -5,7 +5,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import Modal from "@/components/ui/Modal";
 import { useStore, gerarParcelas, type Consorcio } from "@/lib/store";
 import { consorcioStats } from "@/lib/calculations";
-import { brl, dataBR } from "@/lib/format";
+import { brl, dataBR, todayLocal } from "@/lib/format";
 import { Plus, Pencil, Trash2, Check, X } from "lucide-react";
 import MoneyInput from "@/components/ui/MoneyInput";
 import NumberInput from "@/components/ui/NumberInput";
@@ -224,7 +224,7 @@ function ConsorcioModal({
 }) {
   const empty: Omit<Consorcio, "id" | "parcelas"> = {
     bem: "", administradora: "", valorCarta: 0, prazoMeses: 60, parcelaCheia: 0,
-    taxaAdmin: 18, inicio: new Date().toISOString().slice(0, 10), diaVencimento: 10,
+    taxaAdmin: 18, inicio: todayLocal(), diaVencimento: 10,
     debitoAutomatico: false, contaId: undefined, contemplado: false,
     pagamentoReduzido: true, percentualReducao: 0.5,
   };

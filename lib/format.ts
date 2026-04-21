@@ -27,6 +27,12 @@ export const parseBRLDigits = (raw: string): number => {
 // ===== Datas =====
 const MESES_CURTOS = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"];
 
+// Data de hoje em horário local como "YYYY-MM-DD". Evita o bug de `toISOString()` que devolve UTC.
+export function todayLocal(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 // "YYYY-MM" → "JAN/26"
 export function mesRefBR(mesRef: string): string {
   if (!mesRef) return "";
