@@ -120,8 +120,10 @@ export default function Dashboard() {
     };
   }, [recF, desF, receitas, despesas]);
 
-  const desCategoria = desF.filter((d) => {
-    if (filtroCategoria === "pago") return d.pago;
+  const desCategoria = despesas.filter((d) => {
+    if (!incluirEmprestados && d.emprestado) return false;
+    if (!inPeriodo(d.mesRef, periodo, custom)) return false;
+    if (filtroCategoria === "pago") return !!d.pago;
     if (filtroCategoria === "provisionado") return !d.pago;
     return true;
   });
