@@ -5,7 +5,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import Modal from "@/components/ui/Modal";
 import { useStore, type ContaBancaria } from "@/lib/store";
 import { brl } from "@/lib/format";
-import { Plus, Pencil, Trash2, Wallet, TrendingUp, TrendingDown, Star } from "lucide-react";
+import { Plus, Pencil, Trash2, Wallet, TrendingUp, TrendingDown, Star, ArrowLeftRight } from "lucide-react";
 import MoneyInput from "@/components/ui/MoneyInput";
 import UpgradeModal from "@/components/UpgradeModal";
 import { useCurrentUser, getPlanLimit } from "@/lib/auth";
@@ -27,11 +27,12 @@ function saldoRealConta(contaId: string, state: ReturnType<typeof useStore.getSt
 
 export default function ContasPage() {
   const state = useStore();
-  const { contas, receitas, despesas, addConta, updateConta, removeConta, setContaDefault } = state;
+  const { contas, receitas, despesas, addConta, updateConta, removeConta, setContaDefault, addReceita, addDespesa } = state;
   const user = useCurrentUser();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<ContaBancaria | null>(null);
   const [upgrade, setUpgrade] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
 
   const limit = user ? getPlanLimit(user.plano, "contas") : Infinity;
   const atLimit = contas.length >= limit;
@@ -91,6 +92,14 @@ export default function ContasPage() {
             {limit !== Infinity && (
               <span className="text-xs text-zinc-500">{contas.length}/{limit}</span>
             )}
+            <button
+              className="btn btn-ghost"
+              onClick={() => setTransferOpen(true)}
+              disabled={contas.length < 2}
+              title={contas.length < 2 ? "Cadastre ao menos 2 contas" : "Transferir entre contas"}
+            >
+              <ArrowLeftRight size={16} /> Transferir
+            </button>
             <button className="btn btn-primary" onClick={handleAdd}>
               <Plus size={16} /> Nova conta
             </button>
@@ -167,6 +176,43 @@ export default function ContasPage() {
           setOpen(false);
         }}
       />
+      <TransferenciaModal
+        open={transferOpen}
+        contas={contas}
+        onClose={() => setTransferOpen(false)}
+        onSave={async ({ origemId, destinoId, valor, data }) => {
+          const origem = contas.find((c) => c.id === origemId);
+          const destino = contas.find((c) => c.id === destinoId);
+          if (!origem || !destino) return;
+          const mesRef = data.slice(0, 7);
+          const groupId = (typeof crypto !== "undefined" && "randomUUID" in crypto)
+            ? crypto.randomUUID()
+            : `tr-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+          await addDespesa({
+            descricao: `Transferência para ${destino.nome}`,
+            categoria: "Transferência entre contas",
+            valor,
+            data,
+            mesRef,
+            forma: "Pix",
+            contaId: origemId,
+            recorrencia: "Única",
+            groupId,
+            pago: true,
+          });
+          await addReceita({
+            fonte: `Transferência de ${origem.nome}`,
+            categoria: "Transferência entre contas",
+            valor,
+            data,
+            contaId: destinoId,
+            mesRef,
+            recorrencia: "Única",
+            groupId,
+          });
+          setTransferOpen(false);
+        }}
+      />
       <UpgradeModal
         open={upgrade}
         onClose={() => setUpgrade(false)}
@@ -220,6 +266,105 @@ function ContaModal({
         <div className="flex gap-2 justify-end pt-2">
           <button type="button" className="btn btn-ghost" onClick={onClose}>Cancelar</button>
           <button type="submit" className="btn btn-primary">Salvar</button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function TransferenciaModal({
+  open, contas, onClose, onSave,
+}: {
+  open: boolean;
+  contas: ContaBancaria[];
+  onClose: () => void;
+  onSave: (data: { origemId: string; destinoId: string; valor: number; data: string }) => void | Promise<void>;
+}) {
+  const hoje = new Date().toISOString().slice(0, 10);
+  const [origemId, setOrigemId] = useState<string>("");
+  const [destinoId, setDestinoId] = useState<string>("");
+  const [valor, setValor] = useState<number>(0);
+  const [data, setData] = useState<string>(hoje);
+  const [saving, setSaving] = useState(false);
+  const [erro, setErro] = useState<string>("");
+
+  useEffect(() => {
+    if (open) {
+      const padrao = contas.find((c) => c.isDefault)?.id ?? contas[0]?.id ?? "";
+      setOrigemId(padrao);
+      setDestinoId(contas.find((c) => c.id !== padrao)?.id ?? "");
+      setValor(0);
+      setData(hoje);
+      setErro("");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  const contasDestino = contas.filter((c) => c.id !== origemId);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!origemId || !destinoId) { setErro("Selecione conta de origem e destino."); return; }
+    if (origemId === destinoId) { setErro("Origem e destino devem ser diferentes."); return; }
+    if (!valor || valor <= 0) { setErro("Informe um valor maior que zero."); return; }
+    if (!data) { setErro("Informe a data."); return; }
+    setSaving(true);
+    try {
+      await onSave({ origemId, destinoId, valor, data });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title="Transferência entre contas">
+      <form className="space-y-4" onSubmit={submit}>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="label">Conta de origem</label>
+            <select
+              className="select"
+              value={origemId}
+              onChange={(e) => {
+                const novo = e.target.value;
+                setOrigemId(novo);
+                if (novo === destinoId) setDestinoId("");
+              }}
+            >
+              <option value="">Selecione…</option>
+              {contas.map((c) => (
+                <option key={c.id} value={c.id}>{c.nome} · {c.banco}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="label">Conta de destino</label>
+            <select
+              className="select"
+              value={destinoId}
+              onChange={(e) => setDestinoId(e.target.value)}
+            >
+              <option value="">Selecione…</option>
+              {contasDestino.map((c) => (
+                <option key={c.id} value={c.id}>{c.nome} · {c.banco}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="label">Data</label>
+            <input type="date" className="input" required value={data} onChange={(e) => setData(e.target.value)} />
+          </div>
+          <div>
+            <label className="label">Valor</label>
+            <MoneyInput value={valor} onChange={setValor} />
+          </div>
+        </div>
+        {erro && <div className="text-sm text-danger">{erro}</div>}
+        <div className="flex gap-2 justify-end pt-2">
+          <button type="button" className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+          <button type="submit" className="btn btn-primary" disabled={saving}>
+            {saving ? "Salvando…" : "Transferir"}
+          </button>
         </div>
       </form>
     </Modal>
