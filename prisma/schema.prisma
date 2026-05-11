@@ -59,6 +59,7 @@ model Receita {
   fonte       String
   categoria   String
   valor       Float
+  data        String?
   contaId     String?  @map("conta_id")
   mesRef      String   @map("mes_ref")
   recorrencia String   @default("Única")

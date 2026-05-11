@@ -6,7 +6,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import Modal from "@/components/ui/Modal";
 import CreditCardVisual from "@/components/cards/CreditCardVisual";
 import ProgressBar from "@/components/ui/ProgressBar";
-import { useStore, type Cartao, type Bandeira, type ContaBancaria, usoCartao } from "@/lib/store";
+import { useStore, type Cartao, type Bandeira, type ContaBancaria, usoCartao, CATEGORIA_ANTECIPACAO_FATURA, FORMA_ANTECIPACAO_FATURA } from "@/lib/store";
 import { brl, dataBR, mesRefBR } from "@/lib/format";
 import { Plus, Pencil, Trash2, AlertTriangle, CheckCircle2, Undo2, Star, GripVertical, ChevronLeft, ChevronRight } from "lucide-react";
 import UpgradeModal from "@/components/UpgradeModal";
@@ -17,13 +17,14 @@ import ExportButton from "@/components/ui/ExportButton";
 import { exportPDF, exportExcel } from "@/lib/export";
 
 export default function CartoesPage() {
-  const { cartoes, contas, despesas, addCartao, updateCartao, removeCartao, setCartaoDefault, reorderCartoes, marcarFaturaPaga, desmarcarFaturaPaga } = useStore();
+  const { cartoes, contas, despesas, addCartao, updateCartao, removeCartao, setCartaoDefault, reorderCartoes, marcarFaturaPaga, desmarcarFaturaPaga, addDespesa, removeDespesa } = useStore();
   const user = useCurrentUser();
   const [selected, setSelected] = useState<string | null>(cartoes[0]?.id ?? null);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Cartao | null>(null);
   const [upgrade, setUpgrade] = useState(false);
   const [payDialog, setPayDialog] = useState<{ cartaoId: string; mes: string; valor: number } | null>(null);
+  const [antecipDialog, setAntecipDialog] = useState<{ cartaoId: string; mes: string; sugerido: number } | null>(null);
   const [noContaDialog, setNoContaDialog] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState<number | null>(null);
@@ -204,18 +205,26 @@ export default function CartoesPage() {
       )}
 
       {cartao && (() => {
-        // "Limite utilizado total" = todas despesas não pagas, independente do mês
-        const usadoTotal = despesas
+        // "Limite utilizado total" = não-pagas − antecipações (antecipação libera limite)
+        const usadoBruto = despesas
           .filter((d) => d.cartaoId === cartao.id && !d.pago)
           .reduce((s, d) => s + d.valor, 0);
+        const antecipacoesCartao = despesas
+          .filter((d) => d.cartaoId === cartao.id && d.forma === FORMA_ANTECIPACAO_FATURA)
+          .reduce((s, d) => s + d.valor, 0);
+        const usadoTotal = Math.max(0, usadoBruto - antecipacoesCartao);
         // Despesas do mês selecionado
-        const itensMes = despesas
+        const itensMesAll = despesas
           .filter((d) => d.cartaoId === cartao.id && d.mesRef === mesFatura);
+        const itensMes = itensMesAll.filter((d) => d.forma !== FORMA_ANTECIPACAO_FATURA);
+        const antecipacoes = itensMesAll.filter((d) => d.forma === FORMA_ANTECIPACAO_FATURA);
         const totalMes = itensMes.reduce((s, i) => s + i.valor, 0);
-        const totalMesAberto = itensMes.filter((d) => !d.pago).reduce((s, i) => s + i.valor, 0);
+        const totalAntecipado = antecipacoes.reduce((s, a) => s + a.valor, 0);
+        const totalMesAbertoBruto = itensMes.filter((d) => !d.pago).reduce((s, i) => s + i.valor, 0);
+        const totalMesAberto = Math.max(0, totalMesAbertoBruto - totalAntecipado);
         const pct = cartao.limite > 0 ? (usadoTotal / cartao.limite) * 100 : 0;
         const overdue = cartao.faturaPagaMes !== mesFatura && mesFatura <= mesAtual && today.getDate() > cartao.diaVencimento;
-        const faturaPaga = cartao.faturaPagaMes === mesFatura || (itensMes.length > 0 && itensMes.every((d) => d.pago));
+        const faturaPaga = cartao.faturaPagaMes === mesFatura || (itensMes.length > 0 && (itensMes.every((d) => d.pago) || totalMesAberto === 0));
 
         return (
           <>
@@ -275,6 +284,17 @@ export default function CartoesPage() {
                 action={
                   itensMes.length > 0 ? (
                     <div className="flex items-center gap-2">
+                      {!faturaPaga && totalMesAberto > 0 && (
+                        <button
+                          className="btn btn-sm btn-ghost text-success hover:!bg-success/10"
+                          onClick={() => {
+                            if (contas.length === 0) { setNoContaDialog(true); return; }
+                            setAntecipDialog({ cartaoId: cartao.id, mes: mesFatura, sugerido: totalMesAberto });
+                          }}
+                        >
+                          <CheckCircle2 size={14} /> Antecipar pagamento
+                        </button>
+                      )}
                       {faturaPaga ? (
                         <button
                           className="btn btn-sm btn-ghost"
@@ -321,17 +341,20 @@ export default function CartoesPage() {
                   <div className="text-right">
                     <div className="text-xs text-zinc-500 uppercase tracking-wider">Total da fatura</div>
                     <div className="text-2xl font-semibold">{brl(totalMes)}</div>
+                    {totalAntecipado > 0 && (
+                      <div className="text-xs text-success">Antecipado: {brl(totalAntecipado)}</div>
+                    )}
                     {totalMesAberto !== totalMes && (
                       <div className="text-xs text-success">Em aberto: {brl(totalMesAberto)}</div>
                     )}
                   </div>
                 </div>
-                {itensMes.length === 0 ? (
+                {itensMesAll.length === 0 ? (
                   <div className="text-sm text-zinc-500 py-6 text-center">Sem lançamentos neste mês</div>
                 ) : (
                   <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
-                  <table className="t min-w-[560px]">
-                    <thead><tr><th>Descrição</th><th>Categoria</th><th>Data</th><th>Status</th><th className="text-right">Valor</th></tr></thead>
+                  <table className="t min-w-[600px]">
+                    <thead><tr><th>Descrição</th><th>Categoria</th><th>Data</th><th>Status</th><th className="text-right">Valor</th><th></th></tr></thead>
                     <tbody>
                       {itensMes.map((i) => (
                         <tr key={i.id} className={i.pago ? "opacity-60" : ""}>
@@ -340,6 +363,25 @@ export default function CartoesPage() {
                           <td className="text-zinc-500">{dataBR(i.data)}</td>
                           <td>{i.pago ? <span className="pill pill-success">Pago</span> : <span className="pill pill-muted">Aberto</span>}</td>
                           <td className="text-right font-medium">{brl(i.valor)}</td>
+                          <td></td>
+                        </tr>
+                      ))}
+                      {antecipacoes.map((a) => (
+                        <tr key={a.id} className="bg-success/5">
+                          <td className="text-success">{a.descricao}</td>
+                          <td><span className="pill pill-success">{a.categoria}</span></td>
+                          <td className="text-success/80">{dataBR(a.data)}</td>
+                          <td><span className="pill pill-success">Antecipado</span></td>
+                          <td className="text-right font-medium text-success">− {brl(a.valor)}</td>
+                          <td className="text-right">
+                            <button
+                              className="btn btn-ghost btn-sm btn-icon hover:!text-danger"
+                              title="Apagar antecipação"
+                              onClick={() => { if (confirm(`Apagar antecipação de ${brl(a.valor)}?`)) removeDespesa(a.id); }}
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -382,6 +424,29 @@ export default function CartoesPage() {
         open={noContaDialog}
         onClose={() => setNoContaDialog(false)}
       />
+
+      <AntecipacaoDialog
+        data={antecipDialog}
+        contas={contas}
+        cartaoNome={cartao?.nome ?? ""}
+        onCancel={() => setAntecipDialog(null)}
+        onConfirm={async ({ valor, data, contaId }) => {
+          if (!antecipDialog) return;
+          await addDespesa({
+            descricao: `Antecipação — ${cartao?.nome ?? ""} ${mesRefBR(antecipDialog.mes)}`,
+            categoria: CATEGORIA_ANTECIPACAO_FATURA,
+            valor,
+            data,
+            mesRef: antecipDialog.mes,
+            forma: FORMA_ANTECIPACAO_FATURA,
+            contaId,
+            cartaoId: antecipDialog.cartaoId,
+            recorrencia: "Única",
+            pago: true,
+          });
+          setAntecipDialog(null);
+        }}
+      />
     </div>
   );
 }
@@ -422,6 +487,75 @@ function PagarFaturaDialog({
           <button type="button" className="btn btn-ghost" onClick={onCancel}>Cancelar</button>
           <button type="button" className="btn btn-success" disabled={!contaId} onClick={() => onConfirm(contaId)}>
             <CheckCircle2 size={14} /> Pagar fatura
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function AntecipacaoDialog({
+  data, contas, cartaoNome, onCancel, onConfirm,
+}: {
+  data: { cartaoId: string; mes: string; sugerido: number } | null;
+  contas: ContaBancaria[];
+  cartaoNome: string;
+  onCancel: () => void;
+  onConfirm: (p: { valor: number; data: string; contaId: string }) => void;
+}) {
+  const defaultConta = contas.find((c) => c.isDefault) ?? contas[0];
+  const [contaId, setContaId] = useState(defaultConta?.id ?? "");
+  const [valor, setValor] = useState(0);
+  const [dataPag, setDataPag] = useState<string>(new Date().toISOString().slice(0, 10));
+
+  useEffect(() => {
+    if (data) {
+      setContaId(defaultConta?.id ?? "");
+      setValor(data.sugerido);
+      setDataPag(new Date().toISOString().slice(0, 10));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
+
+  const valorInvalido = !valor || valor <= 0 || valor > (data?.sugerido ?? 0);
+
+  return (
+    <Modal open={!!data} onClose={onCancel} title="Antecipar pagamento">
+      <div className="space-y-4">
+        <div className="text-sm text-zinc-400">
+          Antecipando fatura de <span className="font-semibold text-zinc-100">{cartaoNome} — {data ? mesRefBR(data.mes) : ""}</span>. Em aberto: <span className="font-semibold text-success">{data ? brl(data.sugerido) : ""}</span>.
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="col-span-2">
+            <label className="label">Categoria</label>
+            <input className="input cursor-not-allowed opacity-60" value={CATEGORIA_ANTECIPACAO_FATURA} readOnly />
+          </div>
+          <div>
+            <label className="label">Valor</label>
+            <MoneyInput value={valor} onChange={setValor} />
+            {valor > (data?.sugerido ?? 0) && (
+              <div className="text-[11px] text-danger mt-1">Valor maior que o em aberto.</div>
+            )}
+          </div>
+          <div>
+            <label className="label">Data</label>
+            <input type="date" className="input" value={dataPag} onChange={(e) => setDataPag(e.target.value)} />
+          </div>
+          <div className="col-span-2">
+            <label className="label">Conta de débito</label>
+            <select className="select" value={contaId} onChange={(e) => setContaId(e.target.value)}>
+              {contas.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.isDefault ? "★ " : ""}{c.nome} · {c.banco}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="flex gap-2 justify-end pt-2">
+          <button type="button" className="btn btn-ghost" onClick={onCancel}>Cancelar</button>
+          <button type="button" className="btn btn-success" disabled={!contaId || valorInvalido} onClick={() => onConfirm({ valor, data: dataPag, contaId })}>
+            <CheckCircle2 size={14} /> Antecipar
           </button>
         </div>
       </div>

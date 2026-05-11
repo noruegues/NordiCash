@@ -49,7 +49,12 @@ export default function ContasPage() {
       .filter((r) => r.contaId === c.id && r.mesRef <= mesAtual)
       .reduce((s, r) => s + r.valor, 0);
     const saidas = despesas
-      .filter((d) => d.contaId === c.id && (!d.cartaoId || d.pago) && d.mesRef <= mesAtual)
+      .filter((d) => d.contaId === c.id && (!d.cartaoId || d.pago))
+      .filter((d) => {
+        // Antecipação debita na data real do pagamento, não no mês da fatura
+        const refMes = d.forma === "Antecipação de fatura" ? (d.data?.slice(0, 7) ?? d.mesRef) : d.mesRef;
+        return refMes <= mesAtual;
+      })
       .reduce((s, d) => s + d.valor, 0);
     const saldo = c.saldoInicial + entradas - saidas;
     return { conta: c, entradas, saidas, saldo };

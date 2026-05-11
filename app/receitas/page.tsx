@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/Card";
 import PageHeader from "@/components/ui/PageHeader";
 import Modal from "@/components/ui/Modal";
 import { useStore, type Receita, type ContaBancaria } from "@/lib/store";
-import { brl, mesRefBR } from "@/lib/format";
+import { brl, mesRefBR, dataBR } from "@/lib/format";
 import { Plus, Pencil, Trash2, ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react";
 import MacroView from "@/components/MacroView";
 import MoneyInput from "@/components/ui/MoneyInput";
@@ -182,14 +182,15 @@ function ReceitasTab({ pendingEdit, clearPendingEdit, openModal, closeModal }: {
           <div className="text-sm text-zinc-500 py-6 text-center">Nenhuma receita cadastrada</div>
         ) : (
           <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
-          <table className="t min-w-[680px]">
-            <thead><tr><th>Fonte</th><th>Categoria</th><th>Conta</th><th>Mês ref.</th><th>Recorrência</th><th>Tipo</th><th className="text-right">Valor</th><th></th></tr></thead>
+          <table className="t min-w-[780px]">
+            <thead><tr><th>Fonte</th><th>Categoria</th><th>Conta</th><th>Data recebimento</th><th>Mês ref.</th><th>Recorrência</th><th>Tipo</th><th className="text-right">Valor</th><th></th></tr></thead>
             <tbody>
               {receitas.map((r) => (
                 <tr key={r.id} className={r.emprestado ? "bg-loan/5" : ""}>
                   <td className="font-medium">{r.fonte}</td>
                   <td><span className="pill pill-info">{r.categoria}</span></td>
                   <td>{nomeConta(r.contaId)}</td>
+                  <td className="text-zinc-500">{r.data ? dataBR(r.data) : "—"}</td>
                   <td className="text-zinc-400">{mesRefBR(r.mesRef)}</td>
                   <td>{r.recorrencia}</td>
                   <td>{r.emprestado ? <span className="pill pill-loan">Recebimento de empréstimo</span> : <span className="pill pill-success">Receita</span>}</td>
@@ -241,7 +242,81 @@ function nextMonth(mesRef: string, offset: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
+function pad2(n: number) { return String(n).padStart(2, "0"); }
+
+// Domingo de Páscoa (algoritmo Gauss/Anonymous Gregorian)
+function easterSunday(year: number): Date {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(year, month - 1, day);
+}
+
+// Feriados nacionais brasileiros (fixos + móveis). Consciência Negra desde 2024.
+function isFeriadoNacional(d: Date): boolean {
+  const y = d.getFullYear();
+  const m = d.getMonth() + 1;
+  const day = d.getDate();
+
+  const fixos: [number, number][] = [
+    [1, 1],    // Confraternização Universal
+    [4, 21],   // Tiradentes
+    [5, 1],    // Dia do Trabalho
+    [9, 7],    // Independência
+    [10, 12],  // Nossa Senhora Aparecida
+    [11, 2],   // Finados
+    [11, 15],  // Proclamação da República
+    [12, 25],  // Natal
+  ];
+  for (const [fm, fd] of fixos) if (m === fm && day === fd) return true;
+  if (y >= 2024 && m === 11 && day === 20) return true; // Consciência Negra
+
+  const easter = easterSunday(y);
+  const mov: Date[] = [
+    new Date(easter.getTime() - 2 * 86400000),  // Sexta-feira Santa
+    new Date(easter.getTime() - 48 * 86400000), // Carnaval (segunda)
+    new Date(easter.getTime() - 47 * 86400000), // Carnaval (terça)
+    new Date(easter.getTime() + 60 * 86400000), // Corpus Christi
+  ];
+  for (const md of mov) {
+    if (md.getFullYear() === y && md.getMonth() + 1 === m && md.getDate() === day) return true;
+  }
+  return false;
+}
+
+// Nº dia útil do mês (exclui sábado, domingo e feriados nacionais). N começa em 1.
+function nthBusinessDay(year: number, month: number, n: number): string {
+  const d = new Date(year, month - 1, 1);
+  let count = 0;
+  while (true) {
+    const dow = d.getDay();
+    const isUtil = dow !== 0 && dow !== 6 && !isFeriadoNacional(d);
+    if (isUtil) count++;
+    if (count === n) break;
+    d.setDate(d.getDate() + 1);
+  }
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
+// Clampa o dia ao último dia do mês (ex: dia 31 em fevereiro → 28/29)
+function clampDayToMonth(year: number, month: number, day: number): string {
+  const last = new Date(year, month, 0).getDate();
+  return `${year}-${pad2(month)}-${pad2(Math.min(day, last))}`;
+}
+
 const MESES_OPTIONS = Array.from({ length: 23 }, (_, i) => i + 2); // 2 a 24
+const DIAS_UTEIS_OPTIONS = Array.from({ length: 15 }, (_, i) => i + 1);
 
 function ReceitaModal({
   open, onClose, contas, editing, onSave,
@@ -249,14 +324,23 @@ function ReceitaModal({
   open: boolean; onClose: () => void; contas: ContaBancaria[];
   editing: Receita | null; onSave: (items: Omit<Receita, "id">[]) => void;
 }) {
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${pad2(today.getMonth() + 1)}-${pad2(today.getDate())}`;
   const empty: Omit<Receita, "id"> = {
-    fonte: "", categoria: "", valor: 0, contaId: contas[0]?.id, mesRef: new Date().toISOString().slice(0, 7), recorrencia: "Única", emprestado: false,
+    fonte: "", categoria: "", valor: 0, data: todayStr, contaId: contas[0]?.id, mesRef: todayStr.slice(0, 7), recorrencia: "Única", emprestado: false,
   };
   const [f, setF] = useState<Omit<Receita, "id">>(empty);
   const [qtdMeses, setQtdMeses] = useState(12);
+  const [tipoRec, setTipoRec] = useState<"fixo" | "util">("fixo");
+  const [diaUtilN, setDiaUtilN] = useState(5);
 
   useEffect(() => {
-    if (open) { setF(editing ? { ...editing } : empty); setQtdMeses(12); }
+    if (open) {
+      setF(editing ? { ...editing, data: editing.data || `${editing.mesRef}-01` } : empty);
+      setQtdMeses(12);
+      setTipoRec("fixo");
+      setDiaUtilN(5);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editing]);
 
@@ -265,15 +349,26 @@ function ReceitaModal({
 
   const isMensal = !editing && f.recorrencia === "Mensal";
 
+  function dataPara(mesRef: string): string {
+    const [y, m] = mesRef.split("-").map(Number);
+    if (tipoRec === "util") return nthBusinessDay(y, m, diaUtilN);
+    const diaBase = f.data ? parseInt(f.data.slice(8, 10)) : 1;
+    return clampDayToMonth(y, m, diaBase);
+  }
+
   function buildItems(): Omit<Receita, "id">[] {
     if (!isMensal) return [f];
 
     const gId = crypto.randomUUID();
-    return Array.from({ length: qtdMeses }, (_, i) => ({
-      ...f,
-      mesRef: nextMonth(f.mesRef, i),
-      groupId: gId,
-    }));
+    return Array.from({ length: qtdMeses }, (_, i) => {
+      const mes = nextMonth(f.mesRef, i);
+      return {
+        ...f,
+        data: dataPara(mes),
+        mesRef: mes,
+        groupId: gId,
+      };
+    });
   }
 
   return (
@@ -305,6 +400,17 @@ function ReceitaModal({
             </select>
           </div>
           <div>
+            <label className="label">Data de recebimento</label>
+            <input type="date" className="input" required value={f.data ?? ""} onChange={(e) => {
+              const novaData = e.target.value;
+              if (editing) {
+                setF({ ...f, data: novaData });
+              } else {
+                setF({ ...f, data: novaData, mesRef: novaData.slice(0, 7) });
+              }
+            }} />
+          </div>
+          <div>
             <label className="label">Mês de referência</label>
             <input type="month" className="input" required value={f.mesRef} onChange={(e) => setF({ ...f, mesRef: e.target.value })} />
           </div>
@@ -325,6 +431,25 @@ function ReceitaModal({
                     {MESES_OPTIONS.map((n) => <option key={n} value={n}>{n} meses</option>)}
                   </select>
                 </div>
+              )}
+              {isMensal && (
+                <>
+                  <div>
+                    <label className="label">Tipo de dia</label>
+                    <div className="flex rounded border border-border overflow-hidden">
+                      <button type="button" onClick={() => setTipoRec("fixo")} className={`flex-1 px-3 py-2 text-sm ${tipoRec === "fixo" ? "bg-primary text-white" : "text-zinc-400 hover:bg-surface2"}`}>Dia fixo</button>
+                      <button type="button" onClick={() => setTipoRec("util")} className={`flex-1 px-3 py-2 text-sm border-l border-border ${tipoRec === "util" ? "bg-primary text-white" : "text-zinc-400 hover:bg-surface2"}`}>Dia útil</button>
+                    </div>
+                  </div>
+                  {tipoRec === "util" && (
+                    <div>
+                      <label className="label">Nº do dia útil</label>
+                      <select className="select" value={diaUtilN} onChange={(e) => setDiaUtilN(parseInt(e.target.value))}>
+                        {DIAS_UTEIS_OPTIONS.map((n) => <option key={n} value={n}>{n}º dia útil</option>)}
+                      </select>
+                    </div>
+                  )}
+                </>
               )}
             </>
           ) : editing.recorrencia === "Mensal" && editing.groupId ? (
@@ -348,12 +473,18 @@ function ReceitaModal({
                 <span className="text-xs text-zinc-400">{qtdMeses}x de <span className="text-primary font-semibold">{brl(f.valor)}</span></span>
               </div>
               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-1.5">
-                {Array.from({ length: Math.min(qtdMeses, 24) }, (_, i) => (
-                  <div key={i} className="text-center rounded bg-surface2 px-2 py-1.5">
-                    <div className="text-[10px] text-zinc-500">{mesRefBR(nextMonth(f.mesRef, i))}</div>
-                    <div className="text-xs font-semibold text-zinc-200">{brl(f.valor)}</div>
-                  </div>
-                ))}
+                {Array.from({ length: Math.min(qtdMeses, 24) }, (_, i) => {
+                  const mes = nextMonth(f.mesRef, i);
+                  const d = dataPara(mes);
+                  const dia = parseInt(d.slice(8, 10));
+                  return (
+                    <div key={i} className="text-center rounded bg-surface2 px-2 py-1.5">
+                      <div className="text-[10px] text-zinc-500">{mesRefBR(mes)}</div>
+                      <div className="text-[10px] text-primary">dia {dia}</div>
+                      <div className="text-xs font-semibold text-zinc-200">{brl(f.valor)}</div>
+                    </div>
+                  );
+                })}
               </div>
               <div className="text-[11px] text-zinc-500">
                 Total: {brl(f.valor * qtdMeses)} a partir de {mesRefBR(f.mesRef)}

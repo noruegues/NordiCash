@@ -3,7 +3,9 @@ import { create } from "zustand";
 
 // ===== Types =====
 export type Bandeira = "Visa" | "Mastercard" | "Elo" | "Amex" | "Hipercard";
-export type FormaPagamento = "Pix" | "Débito" | "Dinheiro" | "Boleto" | "Cartão";
+export type FormaPagamento = "Pix" | "Débito" | "Dinheiro" | "Boleto" | "Cartão" | "Antecipação de fatura";
+export const CATEGORIA_ANTECIPACAO_FATURA = "Antecipação de Fatura";
+export const FORMA_ANTECIPACAO_FATURA: FormaPagamento = "Antecipação de fatura";
 export type RecorrenciaTipo = "Única" | "Recorrente" | "Indeterminada";
 export type StatusParcela = "Pago" | "Pendente" | "Futuro";
 
@@ -22,6 +24,7 @@ export type Receita = {
   fonte: string;
   categoria: string;
   valor: number;
+  data?: string;
   contaId?: string;
   mesRef: string;
   recorrencia: "Mensal" | "Única";
@@ -536,9 +539,14 @@ export function gerarParcelas(
 
 // ===== Selectors / derived =====
 export function usoCartao(cartaoId: string, despesas: Despesa[], cartaoFaturaPaga?: string) {
-  return despesas
+  const devidas = despesas
     .filter((d) => d.cartaoId === cartaoId)
     .filter((d) => !d.pago)
     .filter((d) => !cartaoFaturaPaga || d.mesRef > cartaoFaturaPaga)
     .reduce((s, d) => s + d.valor, 0);
+  const antecipacoes = despesas
+    .filter((d) => d.cartaoId === cartaoId && d.forma === FORMA_ANTECIPACAO_FATURA)
+    .filter((d) => !cartaoFaturaPaga || d.mesRef > cartaoFaturaPaga)
+    .reduce((s, d) => s + d.valor, 0);
+  return Math.max(0, devidas - antecipacoes);
 }

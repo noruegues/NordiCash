@@ -52,6 +52,7 @@ export default function Dashboard() {
   );
   const desF = useMemo(
     () => despesas.filter((d) => {
+      if (d.forma === "Antecipação de fatura") return false;
       if (!incluirEmprestados && d.emprestado) return false;
       const dentroPeriodo = inPeriodo(d.mesRef, periodo, custom);
       if (!dentroPeriodo) return false;
@@ -90,8 +91,8 @@ export default function Dashboard() {
       const mesAnt = d.toISOString().slice(0, 7);
       const recAtual = receitas.filter((r) => r.mesRef === mes).reduce((s, r) => s + r.valor, 0);
       const recAnterior = receitas.filter((r) => r.mesRef === mesAnt).reduce((s, r) => s + r.valor, 0);
-      const desAtual = despesas.filter((dd) => dd.mesRef === mes).reduce((s, dd) => s + dd.valor, 0);
-      const desAnterior = despesas.filter((dd) => dd.mesRef === mesAnt).reduce((s, dd) => s + dd.valor, 0);
+      const desAtual = despesas.filter((dd) => dd.mesRef === mes && dd.forma !== "Antecipação de fatura").reduce((s, dd) => s + dd.valor, 0);
+      const desAnterior = despesas.filter((dd) => dd.mesRef === mesAnt && dd.forma !== "Antecipação de fatura").reduce((s, dd) => s + dd.valor, 0);
       return {
         deltaReceita: calcDelta(recAtual, recAnterior),
         deltaDespesa: calcDelta(desAtual, desAnterior),
@@ -121,6 +122,7 @@ export default function Dashboard() {
   }, [recF, desF, receitas, despesas]);
 
   const desCategoria = despesas.filter((d) => {
+    if (d.forma === "Antecipação de fatura") return false;
     if (!incluirEmprestados && d.emprestado) return false;
     if (!inPeriodo(d.mesRef, periodo, custom)) return false;
     if (filtroCategoria === "pago") return !!d.pago;
@@ -187,11 +189,21 @@ export default function Dashboard() {
     fluxoMap.set(r.mesRef, cur);
   });
   allDesPeriodo.forEach((d) => {
+    if (d.forma === "Antecipação de fatura") return;
     const cur = fluxoMap.get(d.mesRef) || emptyFluxo();
     if (d.pago) cur.despesaPaga += d.valor;
     else cur.despesaProv += d.valor;
     fluxoMap.set(d.mesRef, cur);
   });
+  // Antecipações: entram como pago E quitam o provisionado da fatura do mesmo mês
+  allDesPeriodo
+    .filter((d) => d.forma === "Antecipação de fatura")
+    .forEach((d) => {
+      const cur = fluxoMap.get(d.mesRef) || emptyFluxo();
+      cur.despesaPaga += d.valor;
+      cur.despesaProv = Math.max(0, cur.despesaProv - d.valor);
+      fluxoMap.set(d.mesRef, cur);
+    });
   const MESES_ABREV = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
   const fmtMes = (mesRef: string) => {
     const [y, m] = mesRef.split("-").map(Number);

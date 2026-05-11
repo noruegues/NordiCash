@@ -45,9 +45,12 @@ export default function DespesasPage() {
   }
 
   const despesas = applyMonthFilter(allDespesas, monthFilter);
-  const total = despesas.reduce((s, d) => s + d.valor, 0);
+  // Antecipação não é gasto — é crédito contra a fatura. Soma de pago quita o provisionado.
+  const totalBruto = despesas.reduce((s, d) => s + d.valor, 0);
+  const totalAntecipacoes = despesas.filter((d) => d.forma === "Antecipação de fatura").reduce((s, d) => s + d.valor, 0);
+  const total = totalBruto - totalAntecipacoes;
   const totalPago = despesas.filter((d) => d.pago).reduce((s, d) => s + d.valor, 0);
-  const totalProvisionado = despesas.filter((d) => !d.pago).reduce((s, d) => s + d.valor, 0);
+  const totalProvisionado = Math.max(0, total - totalPago);
   const totalEmprestado = despesas.filter((d) => d.emprestado).reduce((s, d) => s + d.valor, 0);
 
   const subtotaisCat = Object.entries(
@@ -267,7 +270,7 @@ export default function DespesasPage() {
             <table className="t min-w-[720px]">
               <thead><tr>
                 <th className="w-10">Pago</th>
-                <th className="cursor-pointer select-none" onClick={() => toggleSort("data")}><span className="inline-flex items-center gap-1">Data <SortIcon col="data" /></span></th>
+                <th className="cursor-pointer select-none" onClick={() => toggleSort("data")}><span className="inline-flex items-center gap-1">Data da compra <SortIcon col="data" /></span></th>
                 <th className="cursor-pointer select-none" onClick={() => toggleSort("descricao")}><span className="inline-flex items-center gap-1">Descrição <SortIcon col="descricao" /></span></th>
                 <th className="cursor-pointer select-none" onClick={() => toggleSort("categoria")}><span className="inline-flex items-center gap-1">Categoria <SortIcon col="categoria" /></span></th>
                 <th className="cursor-pointer select-none" onClick={() => toggleSort("forma")}><span className="inline-flex items-center gap-1">Forma <SortIcon col="forma" /></span></th>
@@ -314,9 +317,9 @@ export default function DespesasPage() {
                       )}
                     </td>
                     <td className="text-zinc-500 whitespace-nowrap">{new Date(d.data + "T12:00:00").toLocaleDateString("pt-BR")}</td>
-                    <td className="font-medium">{d.descricao}</td>
-                    <td><span className="pill pill-muted">{d.categoria}</span></td>
-                    <td>{d.forma}</td>
+                    <td className={`font-medium ${d.forma === "Antecipação de fatura" ? "text-success" : ""}`}>{d.descricao}</td>
+                    <td><span className={`pill ${d.forma === "Antecipação de fatura" ? "pill-success" : "pill-muted"}`}>{d.categoria}</span></td>
+                    <td className={d.forma === "Antecipação de fatura" ? "text-success" : ""}>{d.forma}</td>
                     <td className="text-zinc-400">{nomeOrigem(d)}</td>
                     <td className="text-zinc-500">{mesRefBR(d.mesRef)}</td>
                     <td className={`text-right font-semibold ${d.emprestado ? "text-loan" : "text-zinc-100"}`}>{brl(d.valor)}</td>
@@ -367,6 +370,10 @@ export default function DespesasPage() {
         onSave={async (items) => {
           if (editing) {
             await updateDespesa(editing.id, items[0]);
+            if (editing.groupId && items[0].data !== editing.data) {
+              const outras = allDespesas.filter((d) => d.groupId === editing.groupId && d.id !== editing.id);
+              for (const d of outras) await updateDespesa(d.id, { data: items[0].data });
+            }
             setOpen(false);
             return;
           }
@@ -479,7 +486,7 @@ function DespesaModal({
   function buildItems(): Omit<Despesa, "id">[] {
     const base = { ...f };
     if (base.forma === "Cartão") base.contaId = undefined;
-    else base.cartaoId = undefined;
+    else if (base.forma !== "Antecipação de fatura") base.cartaoId = undefined;
     if (base.recorrencia !== "Recorrente") base.recorrenciaMeses = undefined;
 
     if (!isParcela) return [base];
@@ -493,7 +500,6 @@ function DespesaModal({
         descricao: `${base.descricao} (${i + 1}/${qtdMeses})`,
         valor: valorParcela,
         mesRef: mes,
-        data: `${mes}-${base.data.slice(8, 10)}`,
         groupId: gId,
         pago: false,
       });
@@ -560,10 +566,14 @@ function DespesaModal({
             </div>
           )}
           <div>
-            <label className="label">Data</label>
+            <label className="label">Data da compra</label>
             <input type="date" className="input" required value={f.data} onChange={(e) => {
               const novaData = e.target.value;
-              setF({ ...f, data: novaData, mesRef: calcMesRef(novaData, isCartao ? f.cartaoId : undefined) });
+              if (editing) {
+                setF({ ...f, data: novaData });
+              } else {
+                setF({ ...f, data: novaData, mesRef: calcMesRef(novaData, isCartao ? f.cartaoId : undefined) });
+              }
             }} />
           </div>
           <div>
