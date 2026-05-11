@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import PageHeader from "@/components/ui/PageHeader";
 import Modal from "@/components/ui/Modal";
-import { useStore, type ContaBancaria } from "@/lib/store";
+import { useStore, type ContaBancaria, CATEGORIA_TRANSFERENCIA } from "@/lib/store";
 import { brl } from "@/lib/format";
 import { Plus, Pencil, Trash2, Wallet, TrendingUp, TrendingDown, Star, ArrowLeftRight } from "lucide-react";
 import MoneyInput from "@/components/ui/MoneyInput";
@@ -190,7 +190,7 @@ export default function ContasPage() {
             : `tr-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
           await addDespesa({
             descricao: `Transferência para ${destino.nome}`,
-            categoria: "Transferência entre contas",
+            categoria: CATEGORIA_TRANSFERENCIA,
             valor,
             data,
             mesRef,
@@ -202,7 +202,7 @@ export default function ContasPage() {
           });
           await addReceita({
             fonte: `Transferência de ${origem.nome}`,
-            categoria: "Transferência entre contas",
+            categoria: CATEGORIA_TRANSFERENCIA,
             valor,
             data,
             contaId: destinoId,

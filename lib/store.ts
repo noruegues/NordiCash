@@ -6,6 +6,7 @@ export type Bandeira = "Visa" | "Mastercard" | "Elo" | "Amex" | "Hipercard";
 export type FormaPagamento = "Pix" | "Débito" | "Dinheiro" | "Boleto" | "Cartão" | "Antecipação de fatura";
 export const CATEGORIA_ANTECIPACAO_FATURA = "Antecipação de Fatura";
 export const FORMA_ANTECIPACAO_FATURA: FormaPagamento = "Antecipação de fatura";
+export const CATEGORIA_TRANSFERENCIA = "Transferência entre contas";
 export type RecorrenciaTipo = "Única" | "Recorrente" | "Indeterminada";
 export type StatusParcela = "Pago" | "Pendente" | "Futuro";
 

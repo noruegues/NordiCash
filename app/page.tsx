@@ -6,7 +6,7 @@ import AreaFlow from "@/components/charts/AreaFlow";
 import PieCategoria from "@/components/charts/PieCategoria";
 import PatrimonioEvolucao from "@/components/charts/PatrimonioEvolucao";
 import { brl, dataBR } from "@/lib/format";
-import { useStore } from "@/lib/store";
+import { useStore, CATEGORIA_TRANSFERENCIA } from "@/lib/store";
 import { TrendingUp, TrendingDown, Wallet, LineChart } from "lucide-react";
 import { useMemo, useState } from "react";
 
@@ -45,6 +45,7 @@ export default function Dashboard() {
 
   const recF = useMemo(
     () => receitas.filter((r) => {
+      if (r.categoria === CATEGORIA_TRANSFERENCIA) return false;
       if (!incluirEmprestados && r.emprestado) return false;
       return r.mesRef <= mesAtual && inPeriodo(r.mesRef, periodo, custom);
     }),
@@ -53,6 +54,7 @@ export default function Dashboard() {
   const desF = useMemo(
     () => despesas.filter((d) => {
       if (d.forma === "Antecipação de fatura") return false;
+      if (d.categoria === CATEGORIA_TRANSFERENCIA) return false;
       if (!incluirEmprestados && d.emprestado) return false;
       const dentroPeriodo = inPeriodo(d.mesRef, periodo, custom);
       if (!dentroPeriodo) return false;
@@ -89,10 +91,10 @@ export default function Dashboard() {
       const d = new Date(mes + "-01");
       d.setMonth(d.getMonth() - 1);
       const mesAnt = d.toISOString().slice(0, 7);
-      const recAtual = receitas.filter((r) => r.mesRef === mes).reduce((s, r) => s + r.valor, 0);
-      const recAnterior = receitas.filter((r) => r.mesRef === mesAnt).reduce((s, r) => s + r.valor, 0);
-      const desAtual = despesas.filter((dd) => dd.mesRef === mes && dd.forma !== "Antecipação de fatura").reduce((s, dd) => s + dd.valor, 0);
-      const desAnterior = despesas.filter((dd) => dd.mesRef === mesAnt && dd.forma !== "Antecipação de fatura").reduce((s, dd) => s + dd.valor, 0);
+      const recAtual = receitas.filter((r) => r.mesRef === mes && r.categoria !== CATEGORIA_TRANSFERENCIA).reduce((s, r) => s + r.valor, 0);
+      const recAnterior = receitas.filter((r) => r.mesRef === mesAnt && r.categoria !== CATEGORIA_TRANSFERENCIA).reduce((s, r) => s + r.valor, 0);
+      const desAtual = despesas.filter((dd) => dd.mesRef === mes && dd.forma !== "Antecipação de fatura" && dd.categoria !== CATEGORIA_TRANSFERENCIA).reduce((s, dd) => s + dd.valor, 0);
+      const desAnterior = despesas.filter((dd) => dd.mesRef === mesAnt && dd.forma !== "Antecipação de fatura" && dd.categoria !== CATEGORIA_TRANSFERENCIA).reduce((s, dd) => s + dd.valor, 0);
       return {
         deltaReceita: calcDelta(recAtual, recAnterior),
         deltaDespesa: calcDelta(desAtual, desAnterior),
@@ -123,6 +125,7 @@ export default function Dashboard() {
 
   const desCategoria = despesas.filter((d) => {
     if (d.forma === "Antecipação de fatura") return false;
+    if (d.categoria === CATEGORIA_TRANSFERENCIA) return false;
     if (!incluirEmprestados && d.emprestado) return false;
     if (!inPeriodo(d.mesRef, periodo, custom)) return false;
     if (filtroCategoria === "pago") return !!d.pago;
@@ -139,6 +142,7 @@ export default function Dashboard() {
   // Fluxo agregado por mês — usa TODAS as receitas/despesas (incluindo futuras) filtradas só pelo período
   const allRecPeriodo = useMemo(
     () => receitas.filter((r) => {
+      if (r.categoria === CATEGORIA_TRANSFERENCIA) return false;
       if (!incluirEmprestados && r.emprestado) return false;
       return inPeriodo(r.mesRef, periodo, custom);
     }),
@@ -146,6 +150,7 @@ export default function Dashboard() {
   );
   const allDesPeriodo = useMemo(
     () => despesas.filter((d) => {
+      if (d.categoria === CATEGORIA_TRANSFERENCIA) return false;
       if (!incluirEmprestados && d.emprestado) return false;
       return inPeriodo(d.mesRef, periodo, custom);
     }),
